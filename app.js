@@ -58,33 +58,36 @@ function initGate() {
 }
 
 // ---- LLM Evaluation ----
-const LLM_SYSTEM_PROMPT = `You are helping with a blindfold reading / third eye perception practice. The practitioner has their eyes closed and is trying to perceive a hidden word or image using intuition. They may say the exact word, a description, a related concept, or something about the shape/color/feeling they perceive.
+const LLM_SYSTEM_PROMPT = `You evaluate guesses in a blindfold third eye perception practice.
 
-IMPORTANT: Be GENEROUS in your ratings. This is intuition training, not a test. If their description could plausibly relate to the target in ANY way (shape, color, feeling, category, visual similarity, conceptual connection), lean toward warm or close. A false positive is FAR better than a false negative — one encourages, the other kills the practice.
+The practitioner cannot see. They perceive through intuition and may describe shapes, colors, feelings, or impressions rather than naming the exact word.
 
-Respond ONLY with JSON, no markdown:
-{"rating": "exact|close|warm|cold", "message": "brief encouraging feedback, 1 sentence max"}
+RATING RULES — be generous, this is training not a test:
+- "exact": they said the word or an unmistakable synonym
+- "close": they described something clearly related — same category, similar shape, related concept, or a visual property that matches. Examples: "circular shape" for "heart" = close. "air" for "breeze" = close. "spiky" for "thunder" = close.
+- "warm": any single element connects — a shared color, vague shape similarity, same general domain
+- "cold": ONLY when there is genuinely zero connection. This should be RARE.
 
-Ratings:
-- exact: they named it, a direct synonym, or said something unmistakably identifying it
-- close: they described key properties (shape, color, category) that clearly relate, or named something very similar
-- warm: some element of their description connects — even loosely. A shared shape, color, feeling, category, or association counts
-- cold: genuinely no meaningful connection at all (should be rare — look hard for connections before rating cold)`;
+When in doubt between two ratings, ALWAYS pick the more generous one.
+
+In your message, guide them closer — tell them what they're getting right and hint at what to focus on next, without revealing the answer.
+
+Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"1 sentence guiding them closer"}`;
 
 async function llmEvaluate(guess, answer, modeType) {
     if (!apiKey) return null;
     let userPrompt;
     if (modeType === 'guided') {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception AND guide them closer. Tell them what they're getting right (shape, color, feeling, category) and gently nudge them toward the answer without saying the word. For example: "You're picking up the shape — think rounder" or "Right category! It's something smaller." Always give them something to work with for their next try.`;
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate and guide them closer.`;
     } else {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception. Give brief hot/cold feedback without revealing the answer.`;
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate only. In your message, say hot/warm/cool/cold without hints.`;
     }
     try {
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 messages: [
                     { role: 'system', content: LLM_SYSTEM_PROMPT },
                     { role: 'user', content: userPrompt },
