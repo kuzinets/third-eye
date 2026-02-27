@@ -154,8 +154,13 @@
                 <p id="last-heard" class="last-heard"></p>
             </div>
 
-            <div id="mid-session-controls">
+            <div id="judge-controls" class="judge-controls">
+                <button id="btn-exact" class="btn-judge btn-exact">Exact!</button>
+                <button id="btn-almost" class="btn-judge btn-almost">Close!</button>
                 <button id="btn-skip" class="btn-secondary btn-small">Skip</button>
+            </div>
+
+            <div id="mid-session-controls">
                 <button id="btn-toggle-mode" class="btn-secondary btn-small">Switch to Images</button>
             </div>
 
@@ -164,7 +169,7 @@
 
         <!-- Result -->
         <div id="result-area" class="hidden">
-            <p class="result-badge">&#x2713; Correct!</p>
+            <p id="result-badge" class="result-badge">&#x2713; Correct!</p>
             <div id="result-content"></div>
             <div class="result-actions">
                 <button id="btn-new-exercise" class="btn-primary">Start New Exercise</button>

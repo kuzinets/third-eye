@@ -265,33 +265,44 @@ const CLOSE_WORDS = {
 };
 
 function getSemanticDistance(guess, answer) {
-    const g = guess.toLowerCase();
     const a = answer.toLowerCase();
+    const g = guess.toLowerCase();
     if (g === a) return 0;
 
-    // Near-spelling match
     const lev = levenshtein(g, a);
     if (lev <= 1) return 1;
 
-    // Direct close-word match — "you're seeing it"
-    const closeWords = CLOSE_WORDS[a];
-    if (closeWords && closeWords.includes(g)) return 2;
-
-    // Check RELATED_WORDS (for images)
+    // Split multi-word guess — check each word individually
+    const words = g.split(/\s+/).filter(w => w.length > 2);
+    const closeWords = CLOSE_WORDS[a] || [];
     const related = RELATED_WORDS[a];
-    if (related && related.words.includes(g)) return 2;
+    const relatedWords = related ? related.words : [];
+    const allClose = [...closeWords, ...relatedWords];
 
-    // Check if guess is a close word for ANY answer that shares a close-word with the real answer
-    // e.g. guess "bright" for answer "gold" — "bright" is close to "light", and "light" shares
-    // close-words with many luminous things. This catches indirect associations.
-    if (closeWords) {
-        for (const [otherAnswer, otherClose] of Object.entries(CLOSE_WORDS)) {
-            if (otherAnswer === a) continue;
-            if (otherClose.includes(g) && closeWords.some(w => otherClose.includes(w))) return 4;
+    // Check each word in the guess
+    let bestDist = 8;
+    for (const word of words) {
+        if (word === a) { bestDist = 0; break; }
+        const wLev = levenshtein(word, a);
+        if (wLev <= 1) { bestDist = Math.min(bestDist, 1); continue; }
+        if (allClose.includes(word)) { bestDist = Math.min(bestDist, 2); continue; }
+        if (wLev <= 2) { bestDist = Math.min(bestDist, 3); continue; }
+    }
+    if (bestDist <= 3) return bestDist;
+
+    // Full-phrase close-word check
+    if (allClose.includes(g)) return 2;
+
+    // Indirect associations via shared close-words
+    if (closeWords.length > 0) {
+        for (const word of [g, ...words]) {
+            for (const [otherAnswer, otherClose] of Object.entries(CLOSE_WORDS)) {
+                if (otherAnswer === a) continue;
+                if (otherClose.includes(word) && closeWords.some(w => otherClose.includes(w))) return 4;
+            }
         }
     }
 
-    // Spelling similarity as last resort
     if (lev <= 2) return 3;
     const maxLen = Math.max(g.length, a.length);
     if (lev / maxLen < 0.4) return 5;
@@ -354,8 +365,11 @@ const listeningStatus = document.getElementById('listening-status');
 const lastHeard = document.getElementById('last-heard');
 const btnStop = document.getElementById('btn-stop');
 
+const btnExact = document.getElementById('btn-exact');
+const btnAlmost = document.getElementById('btn-almost');
 const btnSkip = document.getElementById('btn-skip');
 const btnToggleMode = document.getElementById('btn-toggle-mode');
+const resultBadge = document.getElementById('result-badge');
 
 const resultContent = document.getElementById('result-content');
 const btnNewExercise = document.getElementById('btn-new-exercise');
@@ -1306,16 +1320,28 @@ function saveStats(stats) {
     localStorage.setItem('thirdeye-stats', JSON.stringify(stats));
 }
 
+function migrateDay(d) {
+    // Migrate old 'successes' field to 'exact'
+    if (d && 'successes' in d && !('exact' in d)) {
+        d.exact = d.successes;
+        d.close = 0;
+        delete d.successes;
+    }
+    return d;
+}
+
 function trackEvent(type) {
     if (!trackingEnabled) return;
     const today = new Date().toISOString().split('T')[0];
     const stats = loadStats();
     if (!stats[today]) {
-        stats[today] = { sessions: 0, items: 0, successes: 0, failuresTimeout: 0, failuresGaveUp: 0 };
+        stats[today] = { sessions: 0, items: 0, exact: 0, close: 0, failuresTimeout: 0, failuresGaveUp: 0 };
     }
+    migrateDay(stats[today]);
     switch (type) {
         case 'session': stats[today].sessions++; break;
-        case 'success': stats[today].successes++; stats[today].items++; break;
+        case 'exact': stats[today].exact++; stats[today].items++; break;
+        case 'close': stats[today].close++; stats[today].items++; break;
         case 'timeout': stats[today].failuresTimeout++; stats[today].items++; break;
         case 'gaveup': stats[today].failuresGaveUp++; stats[today].items++; break;
     }
@@ -1326,8 +1352,9 @@ function trackEvent(type) {
 function renderDashboard() {
     const stats = loadStats();
     const today = new Date().toISOString().split('T')[0];
-    const t = stats[today] || { sessions: 0, items: 0, successes: 0, failuresTimeout: 0, failuresGaveUp: 0 };
-    const pct = t.items > 0 ? Math.round(t.successes / t.items * 100) : 0;
+    const t = migrateDay(stats[today]) || { sessions: 0, items: 0, exact: 0, close: 0, failuresTimeout: 0, failuresGaveUp: 0 };
+    const hits = (t.exact || 0) + (t.close || 0);
+    const pct = t.items > 0 ? Math.round(hits / t.items * 100) : 0;
 
     dashboardToday.innerHTML = `
         <div class="stats-today">
@@ -1335,7 +1362,8 @@ function renderDashboard() {
             <div class="stats-grid">
                 <div class="stat"><span class="stat-num">${t.sessions}</span><span class="stat-label">Sessions</span></div>
                 <div class="stat"><span class="stat-num">${t.items}</span><span class="stat-label">Items</span></div>
-                <div class="stat"><span class="stat-num">${t.successes}</span><span class="stat-label">Correct</span></div>
+                <div class="stat"><span class="stat-num">${t.exact || 0}</span><span class="stat-label">Exact</span></div>
+                <div class="stat"><span class="stat-num">${t.close || 0}</span><span class="stat-label">Close</span></div>
                 <div class="stat"><span class="stat-num">${pct}%</span><span class="stat-label">Success</span></div>
             </div>
         </div>`;
@@ -1354,14 +1382,15 @@ function renderDashboard() {
     }
 
     let html = `<table class="stats-table"><thead><tr>
-        <th>Date</th><th>Sessions</th><th>Items</th><th>Correct</th><th>Timeout</th><th>Gave Up</th><th>%</th>
+        <th>Date</th><th>Sessions</th><th>Items</th><th>Exact</th><th>Close</th><th>Timeout</th><th>Gave Up</th><th>%</th>
     </tr></thead><tbody>`;
 
     dates.forEach(date => {
-        const s = stats[date];
+        const s = migrateDay(stats[date]);
         if (!s) return;
-        const p = s.items > 0 ? Math.round(s.successes / s.items * 100) : 0;
-        html += `<tr><td>${date}</td><td>${s.sessions}</td><td>${s.items}</td><td>${s.successes}</td><td>${s.failuresTimeout}</td><td>${s.failuresGaveUp}</td><td>${p}%</td></tr>`;
+        const hits = (s.exact || 0) + (s.close || 0);
+        const p = s.items > 0 ? Math.round(hits / s.items * 100) : 0;
+        html += `<tr><td>${date}</td><td>${s.sessions}</td><td>${s.items}</td><td>${s.exact || 0}</td><td>${s.close || 0}</td><td>${s.failuresTimeout}</td><td>${s.failuresGaveUp}</td><td>${p}%</td></tr>`;
     });
 
     html += '</tbody></table>';
@@ -1654,88 +1683,95 @@ function startListening() {
 
 function processGuess(transcript) {
     const raw = transcript.trim();
-    lastHeard.textContent = `Heard: "${raw}"`;
 
     let guess = raw.toLowerCase().trim()
         .replace(/^(i think it'?s? |i see |it'?s? |it is |that'?s? |that is |looks like |maybe |probably )/i, '')
         .replace(/^(a |an |the )/i, '')
         .trim();
 
-    const guessSingular = guess.endsWith('s') && guess.length > 3 ? guess.slice(0, -1) : guess;
+    const dist = getSemanticDistance(guess, currentAnswer[0]);
 
-    const isCorrect = currentAnswer.some(ans => {
-        const a = ans.toLowerCase();
-        return guess === a
-            || guessSingular === a
-            || guess.includes(a)
-            || (guess.length >= 3 && a.includes(guess));
-    });
-
-    if (isCorrect) {
-        exerciseActive = false;
-        itemActive = false;
-        if (recognition) {
-            recognition.abort();
-            recognition = null;
-        }
-
-        trackEvent('success');
+    // Perception layer — universal across all feedback modes
+    let perception = null;
+    if (dist <= 1) {
+        perception = "You got it! Open your eyes and mark it.";
         playCorrectSound();
-        const answerText = currentAnswer[0];
-        speak(`Correct! It was ${answerText}. Open your eyes and start a new exercise when you're ready.`);
+    } else if (dist <= 3) {
+        perception = "You're sensing it!";
+    }
 
-        micIcon.textContent = '\u2705';
-        micIcon.classList.add('correct');
-        listeningStatus.textContent = 'Correct!';
+    // Feedback mode layer (for non-perception guesses)
+    let feedback = null;
+    if (feedbackMode === 'hotcold') {
+        let label;
+        if (dist <= 1) label = 'Burning hot!';
+        else if (dist <= 3) label = 'Warm!';
+        else if (dist <= 5) label = 'Cool.';
+        else label = 'Cold.';
 
-        setTimeout(() => {
-            showOnly(resultArea);
-            document.body.classList.remove('focus-mode');
-            focusExit.classList.add('hidden');
+        if (lastGuessDistance !== null) {
+            if (dist < lastGuessDistance) label = 'Getting warmer! ' + label;
+            else if (dist > lastGuessDistance) label = 'Getting colder... ' + label;
+        }
+        lastGuessDistance = dist;
+        feedback = label;
+    } else if (feedbackMode === 'hints') {
+        feedback = getHint(guess, currentAnswer);
+    } else if (feedbackMode === 'spiritual') {
+        feedback = SPIRITUAL_HINTS[Math.floor(Math.random() * SPIRITUAL_HINTS.length)];
+    } else if (feedbackMode === 'custom' && customHints.length > 0) {
+        feedback = customHints[Math.floor(Math.random() * customHints.length)];
+    }
 
-            if (mode === 'words') {
-                resultContent.textContent = answerText;
-                resultContent.className = 'word-display';
-            } else {
-                resultContent.textContent = currentDisplay + ' ' + answerText;
-                resultContent.className = 'image-display';
-                resultContent.style.fontSize = '';
-            }
-        }, 2500);
+    if (!feedback) {
+        feedback = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
+        tryAgainIndex++;
+    }
+
+    // Combine: perception overrides for close, otherwise use feedback
+    const message = perception ? perception : feedback;
+
+    if (!perception) playTryAgainSound();
+
+    speak(message);
+    lastHeard.textContent = `"${raw}" — ${message}`;
+}
+
+function finishItem(type) {
+    trackEvent(type);
+    exerciseActive = false;
+    itemActive = false;
+    if (recognition) {
+        recognition.abort();
+        recognition = null;
+    }
+    speechSynthesis.cancel();
+
+    const answerText = currentAnswer[0];
+
+    if (type === 'exact') {
+        playCorrectSound();
+        speak(`It was ${answerText}. Well done.`);
+        resultBadge.textContent = '\u2713 Correct!';
+        resultBadge.className = 'result-badge';
     } else {
         playTryAgainSound();
+        speak(`It was ${answerText}. Good perception.`);
+        resultBadge.textContent = '\u2248 Close!';
+        resultBadge.className = 'result-badge close-result';
+    }
 
-        let feedback = null;
+    showOnly(resultArea);
+    document.body.classList.remove('focus-mode');
+    focusExit.classList.add('hidden');
 
-        if (feedbackMode === 'hotcold') {
-            const dist = getSemanticDistance(guess, currentAnswer[0]);
-            let label;
-            if (dist <= 1) label = 'Burning hot!';
-            else if (dist <= 3) label = 'Warm!';
-            else if (dist <= 5) label = 'Cool.';
-            else label = 'Cold.';
-
-            if (lastGuessDistance !== null) {
-                if (dist < lastGuessDistance) label = 'Getting warmer! ' + label;
-                else if (dist > lastGuessDistance) label = 'Getting colder... ' + label;
-            }
-            lastGuessDistance = dist;
-            feedback = label;
-        } else if (feedbackMode === 'hints') {
-            feedback = getHint(guess, currentAnswer);
-        } else if (feedbackMode === 'spiritual') {
-            feedback = SPIRITUAL_HINTS[Math.floor(Math.random() * SPIRITUAL_HINTS.length)];
-        } else if (feedbackMode === 'custom' && customHints.length > 0) {
-            feedback = customHints[Math.floor(Math.random() * customHints.length)];
-        }
-
-        if (!feedback) {
-            feedback = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
-            tryAgainIndex++;
-        }
-
-        speak(feedback);
-        lastHeard.textContent = `"${raw}" — ${feedback}`;
+    if (mode === 'words') {
+        resultContent.textContent = answerText;
+        resultContent.className = 'word-display';
+    } else {
+        resultContent.textContent = currentDisplay + ' ' + answerText;
+        resultContent.className = 'image-display';
+        resultContent.style.fontSize = '';
     }
 }
 
@@ -1921,7 +1957,9 @@ function init() {
     btnNewExercise.addEventListener('click', startExercise);
     btnBackMenu.addEventListener('click', goToSettings);
 
-    // Mid-session
+    // Self-judgment
+    btnExact.addEventListener('click', () => { if (itemActive) finishItem('exact'); });
+    btnAlmost.addEventListener('click', () => { if (itemActive) finishItem('close'); });
     btnSkip.addEventListener('click', skipExercise);
     btnToggleMode.addEventListener('click', () => {
         setMode(mode === 'words' ? 'images' : 'words');
