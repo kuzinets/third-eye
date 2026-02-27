@@ -7,7 +7,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
+    <!-- Password Gate -->
+    <div id="password-gate" class="password-gate">
+        <h1 class="title">Third Eye</h1>
+        <div class="gate-form">
+            <input type="password" id="gate-password" placeholder="Enter password" autocomplete="off">
+            <button id="gate-submit" class="btn-primary gate-btn">Enter</button>
+            <p id="gate-error" class="gate-error hidden">Incorrect password</p>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
         <h1 class="title">Third Eye</h1>
 
         <!-- Settings Panel -->
@@ -23,8 +33,8 @@
                     <label for="feedback-mode">Feedback Mode</label>
                     <select id="feedback-mode">
                         <option value="simple">Simple</option>
-                        <option value="hints">Progressive Hints</option>
-                        <option value="hotcold">Hot / Cold</option>
+                        <option value="hotcold">Hot / Cold (AI)</option>
+                        <option value="guided">Hot / Cold + Guided (AI)</option>
                         <option value="spiritual">Spiritual</option>
                         <option value="custom">Custom</option>
                     </select>
@@ -101,7 +111,11 @@
                 <div class="timer-inputs">
                     <div class="input-group">
                         <input type="number" id="session-minutes" min="1" max="120" value="5">
-                        <span>min</span>
+                        <span>min total</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="item-minutes" min="1" max="30" value="3">
+                        <span>min per item</span>
                     </div>
                 </div>
             </div>
@@ -126,9 +140,10 @@
             <button id="btn-dashboard-back" class="btn-secondary">Back</button>
         </div>
 
-        <!-- Session timer bar -->
+        <!-- Timer bars -->
         <div id="session-bar" class="session-bar hidden">
             <span id="session-time-left">05:00</span>
+            <span id="item-time-left" class="item-timer hidden"></span>
         </div>
 
         <!-- Countdown -->
@@ -169,6 +184,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Logo -->
+    <img src="kailasa-flag.png" alt="Kailasa" class="site-logo">
 
     <!-- Exercise exit button -->
     <button id="exit-btn" class="exit-btn hidden" aria-label="Back to menu">&times;</button>

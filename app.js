@@ -2,6 +2,108 @@
 // Third Eye — Blindfold Reading Practice
 // ============================================================
 
+// ---- Password Gate & API Key ----
+const ENCRYPTED_KEY = 'OApEHBMcC2YLJAQCARYJUlFeK0ZQBRZeGRsGBBENXyUnQiRmADA+VhoxOjA/OyckOx0pGDMnNCAdFAsNPikyZgoGK1EbCxQ3KiAIFRciBiIOLSdSCQ0LByc5Uw8jEwQLAiobLQxYMxowDCkkOCg4AwQLDjMKQwo7CxoDO0AwOxVdIxI5FwdMBzMqC1gGPgouVEEFAyQ8NFlLLQAZBDtSJDl6ICg=';
+let apiKey = null;
+
+function decryptKey(password) {
+    try {
+        const bytes = Uint8Array.from(atob(ENCRYPTED_KEY), c => c.charCodeAt(0));
+        let result = '';
+        for (let i = 0; i < bytes.length; i++) {
+            result += String.fromCharCode(bytes[i] ^ password.charCodeAt(i % password.length));
+        }
+        if (result.startsWith('sk-')) return result;
+        return null;
+    } catch (e) { return null; }
+}
+
+function initGate() {
+    const gate = document.getElementById('password-gate');
+    const app = document.getElementById('app');
+    const input = document.getElementById('gate-password');
+    const btn = document.getElementById('gate-submit');
+    const err = document.getElementById('gate-error');
+
+    // Check session
+    const saved = sessionStorage.getItem('thirdeye-auth');
+    if (saved) {
+        const key = decryptKey(saved);
+        if (key) {
+            apiKey = key;
+            gate.classList.add('hidden');
+            app.classList.remove('hidden');
+            return;
+        }
+    }
+
+    function tryPassword() {
+        const pw = input.value;
+        const key = decryptKey(pw);
+        if (key) {
+            apiKey = key;
+            sessionStorage.setItem('thirdeye-auth', pw);
+            gate.classList.add('hidden');
+            app.classList.remove('hidden');
+        } else {
+            err.classList.remove('hidden');
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    btn.addEventListener('click', tryPassword);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryPassword(); });
+    input.focus();
+}
+
+// ---- LLM Evaluation ----
+const LLM_SYSTEM_PROMPT = `You are helping with a blindfold reading / third eye perception practice. The practitioner has their eyes closed and is trying to perceive a hidden word or image using intuition. They may say the exact word, a description, a related concept, or something about the shape/color/feeling they perceive.
+
+IMPORTANT: Be GENEROUS in your ratings. This is intuition training, not a test. If their description could plausibly relate to the target in ANY way (shape, color, feeling, category, visual similarity, conceptual connection), lean toward warm or close. A false positive is FAR better than a false negative — one encourages, the other kills the practice.
+
+Respond ONLY with JSON, no markdown:
+{"rating": "exact|close|warm|cold", "message": "brief encouraging feedback, 1 sentence max"}
+
+Ratings:
+- exact: they named it, a direct synonym, or said something unmistakably identifying it
+- close: they described key properties (shape, color, category) that clearly relate, or named something very similar
+- warm: some element of their description connects — even loosely. A shared shape, color, feeling, category, or association counts
+- cold: genuinely no meaningful connection at all (should be rare — look hard for connections before rating cold)`;
+
+async function llmEvaluate(guess, answer, modeType) {
+    if (!apiKey) return null;
+    let userPrompt;
+    if (modeType === 'guided') {
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception AND explain what they're sensing correctly (if anything). In your message, hint at what aspect of their perception connects to the answer without revealing the answer itself.`;
+    } else {
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception. Give brief hot/cold feedback without revealing the answer.`;
+    }
+    try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: LLM_SYSTEM_PROMPT },
+                    { role: 'user', content: userPrompt },
+                ],
+                temperature: 0.3,
+                max_tokens: 120,
+            }),
+        });
+        const data = await resp.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        // Parse JSON from response (strip markdown fences if present)
+        const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        return JSON.parse(cleaned);
+    } catch (e) {
+        console.warn('LLM evaluation failed:', e);
+        return null;
+    }
+}
+
 // ---- Configuration ----
 const COUNTDOWN_SECONDS = 4;
 
@@ -340,6 +442,9 @@ let selectedAudioInputId = 'default';
 let selectedAudioOutputId = 'default';
 let customHints = [];
 let lastGuessDistance = null;
+let itemEndTime = null;
+let itemTickId = null;
+let llmPending = false;
 
 // ---- DOM ----
 const settingsPanel = document.getElementById('settings-panel');
@@ -375,8 +480,10 @@ const btnNewExercise = document.getElementById('btn-new-exercise');
 const btnBackMenu = document.getElementById('btn-back-menu');
 
 const sessionMinutesInput = document.getElementById('session-minutes');
+const itemMinutesInput = document.getElementById('item-minutes');
 const sessionBar = document.getElementById('session-bar');
 const sessionTimeLeft = document.getElementById('session-time-left');
+const itemTimeLeft = document.getElementById('item-time-left');
 
 const voiceSelect = document.getElementById('voice-select');
 const btnVoiceTest = document.getElementById('btn-voice-test');
@@ -623,368 +730,311 @@ function createReverb(ctx, duration, decay) {
 }
 
 // ---- Background Music Generators ----
-// All based on brainwave entrainment research and sacred frequencies.
+// Each wraps a brainwave entrainment core in lush ambient layers.
 
-// Theta Binaural Beat (6 Hz) — deep meditation, intuition
-// Left ear 200Hz, right ear 206Hz. Brain perceives 6Hz difference.
-// REQUIRES HEADPHONES for binaural effect.
+function createBrownNoise(ctx, length) {
+    const buf = ctx.createBuffer(2, length, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        let last = 0;
+        for (let i = 0; i < length; i++) {
+            const w = Math.random() * 2 - 1;
+            d[i] = (last + 0.02 * w) / 1.02;
+            last = d[i];
+            d[i] *= 3.5;
+        }
+    }
+    return buf;
+}
+
+// Helper: create a looping filtered noise bed
+function createNoiseBed(ctx, dest, filterFreq, gain) {
+    const noise = ctx.createBufferSource();
+    noise.buffer = createBrownNoise(ctx, 2 * ctx.sampleRate);
+    noise.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = filterFreq;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    noise.connect(f);
+    f.connect(g);
+    g.connect(dest);
+    noise.start();
+    return noise;
+}
+
+// Helper: create a gently evolving chord pad
+function createChordPad(ctx, dest, reverb, freqs, vol) {
+    const oscs = [];
+    freqs.forEach(freq => {
+        // Two detuned sine oscillators per note for warmth
+        [-3, 3].forEach(detune => {
+            const o = ctx.createOscillator();
+            o.type = 'sine';
+            o.frequency.value = freq;
+            o.detune.value = detune;
+            const g = ctx.createGain();
+            g.gain.value = vol / freqs.length;
+            o.connect(g);
+            g.connect(dest);
+            if (reverb) g.connect(reverb);
+            o.start();
+            oscs.push(o);
+        });
+    });
+    return oscs;
+}
+
+// Theta Binaural 6Hz — deep meditation
 function createThetaBinaural(ctx) {
     const master = ctx.createGain();
-    master.gain.value = 0.15;
+    master.gain.value = 0.14;
     master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 4, 1.5);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.3;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    const oscs = [];
-
-    // Left ear: 200 Hz
-    const left = ctx.createOscillator();
-    left.type = 'sine';
-    left.frequency.value = 200;
-    const leftPan = ctx.createStereoPanner();
-    leftPan.pan.value = -1;
-    const leftGain = ctx.createGain();
-    leftGain.gain.value = 0.3;
-    left.connect(leftGain);
-    leftGain.connect(leftPan);
-    leftPan.connect(master);
-    left.start();
-    oscs.push(left);
-
-    // Right ear: 206 Hz (6 Hz theta difference)
-    const right = ctx.createOscillator();
-    right.type = 'sine';
-    right.frequency.value = 206;
-    const rightPan = ctx.createStereoPanner();
-    rightPan.pan.value = 1;
-    const rightGain = ctx.createGain();
-    rightGain.gain.value = 0.3;
-    right.connect(rightGain);
-    rightGain.connect(rightPan);
-    rightPan.connect(master);
-    right.start();
-    oscs.push(right);
-
-    // Gentle ambient bed — very soft pad for warmth
-    const pad = ctx.createOscillator();
-    pad.type = 'sine';
-    pad.frequency.value = 100;
-    const padGain = ctx.createGain();
-    padGain.gain.value = 0.04;
-    pad.connect(padGain);
-    padGain.connect(reverb);
-    pad.start();
-    oscs.push(pad);
-
-    // Slow breathing LFO on master
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.06;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.02;
-    lfo.connect(lfoGain);
-    lfoGain.connect(master.gain);
-    lfo.start();
-    oscs.push(lfo);
-
-    return () => {
-        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        master.disconnect();
-    };
-}
-
-// Gamma Binaural Beat (40 Hz) — heightened awareness, perception
-// Left ear 200Hz, right ear 240Hz. Brain perceives 40Hz difference.
-// REQUIRES HEADPHONES for binaural effect.
-function createGammaBinaural(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 3, 2);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.25;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    const oscs = [];
-
-    // Left ear: 200 Hz
-    const left = ctx.createOscillator();
-    left.type = 'sine';
-    left.frequency.value = 200;
-    const leftPan = ctx.createStereoPanner();
-    leftPan.pan.value = -1;
-    const leftGain = ctx.createGain();
-    leftGain.gain.value = 0.25;
-    left.connect(leftGain);
-    leftGain.connect(leftPan);
-    leftPan.connect(master);
-    left.start();
-    oscs.push(left);
-
-    // Right ear: 240 Hz (40 Hz gamma difference)
-    const right = ctx.createOscillator();
-    right.type = 'sine';
-    right.frequency.value = 240;
-    const rightPan = ctx.createStereoPanner();
-    rightPan.pan.value = 1;
-    const rightGain = ctx.createGain();
-    rightGain.gain.value = 0.25;
-    right.connect(rightGain);
-    rightGain.connect(rightPan);
-    rightPan.connect(master);
-    right.start();
-    oscs.push(right);
-
-    // Soft sub pad
-    const pad = ctx.createOscillator();
-    pad.type = 'sine';
-    pad.frequency.value = 110;
-    const padGain = ctx.createGain();
-    padGain.gain.value = 0.03;
-    pad.connect(padGain);
-    padGain.connect(reverb);
-    pad.start();
-    oscs.push(pad);
-
-    return () => {
-        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        master.disconnect();
-    };
-}
-
-// Alpha Isochronic Tones (10 Hz) — relaxed focus, calm awareness
-// Amplitude-modulated tone pulsing at 10Hz. Works WITHOUT headphones.
-function createAlphaIsochronic(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 3, 2);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.3;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    const oscs = [];
-
-    // Carrier tone
-    const carrier = ctx.createOscillator();
-    carrier.type = 'sine';
-    carrier.frequency.value = 200;
-
-    // Isochronic pulse: amplitude modulation at 10 Hz
-    const carrierGain = ctx.createGain();
-    carrierGain.gain.value = 0.5; // center point
-
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine'; // smooth pulse (square = harsher)
-    lfo.frequency.value = 10; // 10 Hz alpha
-
-    const lfoDepth = ctx.createGain();
-    lfoDepth.gain.value = 0.5; // modulates gain between 0 and 1
-
-    lfo.connect(lfoDepth);
-    lfoDepth.connect(carrierGain.gain);
-
-    carrier.connect(carrierGain);
-    carrierGain.connect(master);
-    carrierGain.connect(reverb);
-
-    carrier.start();
-    lfo.start();
-    oscs.push(carrier, lfo);
-
-    // Gentle background wash — soft filtered noise
-    const bufferSize = 2 * ctx.sampleRate;
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        data[i] = (lastOut + 0.02 * white) / 1.02;
-        lastOut = data[i];
-        data[i] *= 3.5;
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 300;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.08;
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(master);
-    noise.start();
-
-    return () => {
-        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        try { noise.stop(); } catch(e) {}
-        master.disconnect();
-    };
-}
-
-// 528 Hz Solfeggio — "Miracle tone" / healing frequency
-// The solfeggio frequency with the most evidence for relaxation response.
-function createSolfeggio528(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 5, 1.5);
+    const reverb = createReverb(ctx, 6, 1.2);
     const reverbGain = ctx.createGain();
     reverbGain.gain.value = 0.5;
     reverb.connect(reverbGain);
     reverbGain.connect(master);
-
-    const dry = ctx.createGain();
-    dry.gain.value = 0.4;
-    dry.connect(master);
-
     const oscs = [];
 
-    // Primary 528 Hz
-    const primary = ctx.createOscillator();
-    primary.type = 'sine';
-    primary.frequency.value = 528;
-    const primaryGain = ctx.createGain();
-    primaryGain.gain.value = 0.25;
-    primary.connect(primaryGain);
-    primaryGain.connect(reverb);
-    primaryGain.connect(dry);
-    primary.start();
-    oscs.push(primary);
+    // Binaural core: L=150Hz, R=156Hz (6Hz theta)
+    [[150, -1], [156, 1]].forEach(([freq, pan]) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const p = ctx.createStereoPanner(); p.pan.value = pan;
+        const g = ctx.createGain(); g.gain.value = 0.15;
+        o.connect(g); g.connect(p); p.connect(master);
+        o.start(); oscs.push(o);
+    });
 
-    // Octave below: 264 Hz (subtle)
-    const sub = ctx.createOscillator();
-    sub.type = 'sine';
-    sub.frequency.value = 264;
-    const subGain = ctx.createGain();
-    subGain.gain.value = 0.12;
-    sub.connect(subGain);
-    subGain.connect(dry);
-    sub.start();
-    oscs.push(sub);
+    // Warm evolving pad: Cmaj7 voicing very low
+    oscs.push(...createChordPad(ctx, master, reverb, [65.41, 82.41, 98, 123.47], 0.04));
 
-    // Octave above: 1056 Hz (very subtle shimmer)
-    const upper = ctx.createOscillator();
-    upper.type = 'sine';
-    upper.frequency.value = 1056;
-    const upperGain = ctx.createGain();
-    upperGain.gain.value = 0.04;
-    upper.connect(upperGain);
-    upperGain.connect(reverb);
-    upper.start();
-    oscs.push(upper);
+    // Filtered noise ocean wash
+    const n = createNoiseBed(ctx, master, 250, 0.06);
 
-    // Slow breathing LFO
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.06;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.04;
-    lfo.connect(lfoGain);
-    lfoGain.connect(master.gain);
-    lfo.start();
-    oscs.push(lfo);
+    // Slow spatial movement
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.04;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.015;
+    lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start(); oscs.push(lfo);
+
+    // Gentle shimmer bells
+    let bellId = null;
+    function scheduleBell() {
+        if (!master.context || master.context.state === 'closed') return;
+        const t = ctx.currentTime;
+        const freq = [396, 528, 639, 741][Math.floor(Math.random() * 4)];
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.03, t + 0.5);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 4);
+        o.connect(g); g.connect(reverb);
+        o.start(t); o.stop(t + 4);
+        bellId = setTimeout(scheduleBell, 5000 + Math.random() * 8000);
+    }
+    bellId = setTimeout(scheduleBell, 2000);
 
     return () => {
+        if (bellId) clearTimeout(bellId);
         oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { n.stop(); } catch(e) {}
         master.disconnect();
     };
 }
 
-// Om 136.1 Hz — Earth year frequency
-// Based on the orbital period of Earth. Used in Tibetan singing bowls
-// and Indian classical music (Sa = 136.1 Hz in some tuning systems).
-function createOm136(ctx) {
+// Gamma Binaural 40Hz — heightened awareness
+function createGammaBinaural(ctx) {
     const master = ctx.createGain();
-    master.gain.value = 0.15;
+    master.gain.value = 0.13;
     master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 4, 1.8);
+    const reverb = createReverb(ctx, 4, 1.5);
     const reverbGain = ctx.createGain();
     reverbGain.gain.value = 0.4;
     reverb.connect(reverbGain);
     reverbGain.connect(master);
-
-    const dry = ctx.createGain();
-    dry.gain.value = 0.5;
-    dry.connect(master);
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 800;
-    filter.connect(reverb);
-    filter.connect(dry);
-
     const oscs = [];
 
-    // Fundamental: 136.1 Hz (sine — pure Om)
-    const fundamental = ctx.createOscillator();
-    fundamental.type = 'sine';
-    fundamental.frequency.value = 136.1;
-    const fundGain = ctx.createGain();
-    fundGain.gain.value = 0.3;
-    fundamental.connect(fundGain);
-    fundGain.connect(filter);
-    fundamental.start();
-    oscs.push(fundamental);
+    // Binaural core: L=190Hz, R=230Hz (40Hz gamma)
+    [[190, -1], [230, 1]].forEach(([freq, pan]) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const p = ctx.createStereoPanner(); p.pan.value = pan;
+        const g = ctx.createGain(); g.gain.value = 0.12;
+        o.connect(g); g.connect(p); p.connect(master);
+        o.start(); oscs.push(o);
+    });
 
-    // Natural overtones (triangle — soft odd harmonics)
-    const fifth = ctx.createOscillator();
-    fifth.type = 'triangle';
-    fifth.frequency.value = 272.2; // octave
-    fifth.detune.value = 2;
-    const fifthGain = ctx.createGain();
-    fifthGain.gain.value = 0.12;
-    fifth.connect(fifthGain);
-    fifthGain.connect(filter);
-    fifth.start();
-    oscs.push(fifth);
+    // Bright ambient pad: Am9 chord high up
+    oscs.push(...createChordPad(ctx, master, reverb, [220, 329.63, 440, 493.88], 0.03));
 
-    const third = ctx.createOscillator();
-    third.type = 'triangle';
-    third.frequency.value = 408.3; // 3rd harmonic
-    third.detune.value = -2;
-    const thirdGain = ctx.createGain();
-    thirdGain.gain.value = 0.06;
-    third.connect(thirdGain);
-    thirdGain.connect(filter);
-    third.start();
-    oscs.push(third);
+    // Crisp noise layer — higher freq
+    const n = createNoiseBed(ctx, master, 400, 0.04);
 
-    // Sub octave
-    const sub = ctx.createOscillator();
-    sub.type = 'sine';
-    sub.frequency.value = 68.05; // octave below
-    const subGain = ctx.createGain();
-    subGain.gain.value = 0.1;
-    sub.connect(subGain);
-    subGain.connect(dry);
-    sub.start();
-    oscs.push(sub);
-
-    // Slow breathing LFO
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.07; // ~one breath cycle per 14s
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.03;
-    lfo.connect(lfoGain);
-    lfoGain.connect(master.gain);
-    lfo.start();
-    oscs.push(lfo);
+    // Pulsing brightness LFO on the pad
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.08;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.012;
+    lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start(); oscs.push(lfo);
 
     return () => {
         oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { n.stop(); } catch(e) {}
+        master.disconnect();
+    };
+}
+
+// Alpha Isochronic 10Hz — relaxed focus (no headphones needed)
+function createAlphaIsochronic(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.13;
+    master.connect(ctx.destination);
+    const reverb = createReverb(ctx, 5, 1.3);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.5;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+    const oscs = [];
+
+    // Isochronic carrier with 10Hz AM
+    const carrier = ctx.createOscillator(); carrier.type = 'sine'; carrier.frequency.value = 210;
+    const cGain = ctx.createGain(); cGain.gain.value = 0.4;
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 10;
+    const lfoD = ctx.createGain(); lfoD.gain.value = 0.4;
+    lfo.connect(lfoD); lfoD.connect(cGain.gain);
+    carrier.connect(cGain); cGain.connect(master); cGain.connect(reverb);
+    carrier.start(); lfo.start(); oscs.push(carrier, lfo);
+
+    // Lush pad underneath: Fmaj7
+    oscs.push(...createChordPad(ctx, master, reverb, [87.31, 110, 130.81, 164.81], 0.04));
+
+    // Ocean noise bed
+    const n = createNoiseBed(ctx, master, 300, 0.06);
+
+    // Breathing LFO
+    const breathe = ctx.createOscillator(); breathe.type = 'sine'; breathe.frequency.value = 0.05;
+    const bG = ctx.createGain(); bG.gain.value = 0.012;
+    breathe.connect(bG); bG.connect(master.gain); breathe.start(); oscs.push(breathe);
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { n.stop(); } catch(e) {}
+        master.disconnect();
+    };
+}
+
+// 528Hz Solfeggio — healing tone with evolving harmonics
+function createSolfeggio528(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.13;
+    master.connect(ctx.destination);
+    const reverb = createReverb(ctx, 7, 1.0);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.6;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+    const oscs = [];
+
+    // 528Hz fundamental with detuned pair for shimmer
+    [-2, 0, 2].forEach(det => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 528; o.detune.value = det;
+        const g = ctx.createGain(); g.gain.value = 0.08;
+        o.connect(g); g.connect(master); g.connect(reverb);
+        o.start(); oscs.push(o);
+    });
+
+    // Sub layer: 264Hz
+    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 264;
+    const subG = ctx.createGain(); subG.gain.value = 0.06;
+    sub.connect(subG); subG.connect(master); sub.start(); oscs.push(sub);
+
+    // Gentle chord bed: C/E/G using low octaves
+    oscs.push(...createChordPad(ctx, master, reverb, [65.41, 82.41, 98], 0.03));
+
+    // Filtered noise wash
+    const n = createNoiseBed(ctx, master, 200, 0.05);
+
+    // Slow wandering filter on a high shimmer
+    const shimmer = ctx.createOscillator(); shimmer.type = 'sine'; shimmer.frequency.value = 1056;
+    const shimF = ctx.createBiquadFilter(); shimF.type = 'bandpass'; shimF.frequency.value = 1056; shimF.Q.value = 5;
+    const shimG = ctx.createGain(); shimG.gain.value = 0.015;
+    shimmer.connect(shimF); shimF.connect(shimG); shimG.connect(reverb);
+    // LFO on filter freq
+    const sLfo = ctx.createOscillator(); sLfo.type = 'sine'; sLfo.frequency.value = 0.03;
+    const sLfoG = ctx.createGain(); sLfoG.gain.value = 200;
+    sLfo.connect(sLfoG); sLfoG.connect(shimF.frequency);
+    shimmer.start(); sLfo.start(); oscs.push(shimmer, sLfo);
+
+    // Breathing
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.05;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.02;
+    lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start(); oscs.push(lfo);
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { n.stop(); } catch(e) {}
+        master.disconnect();
+    };
+}
+
+// Om 136.1Hz — Earth frequency with singing bowl texture
+function createOm136(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.13;
+    master.connect(ctx.destination);
+    const reverb = createReverb(ctx, 8, 0.8);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.6;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+    const oscs = [];
+
+    // Om fundamental with slight detuning for richness
+    [-2, 0, 2].forEach(det => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 136.1; o.detune.value = det;
+        const g = ctx.createGain(); g.gain.value = 0.1;
+        o.connect(g); g.connect(master); g.connect(reverb);
+        o.start(); oscs.push(o);
+    });
+
+    // Overtones (bowl harmonics): 2nd, 3rd, 5th
+    [272.2, 408.3, 680.5].forEach((freq, i) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const g = ctx.createGain(); g.gain.value = [0.04, 0.02, 0.01][i];
+        o.connect(g); g.connect(reverb);
+        o.start(); oscs.push(o);
+    });
+
+    // Sub drone
+    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 68.05;
+    const subG = ctx.createGain(); subG.gain.value = 0.06;
+    sub.connect(subG); subG.connect(master); sub.start(); oscs.push(sub);
+
+    // Deep noise bed
+    const n = createNoiseBed(ctx, master, 180, 0.05);
+
+    // Slow bowl strikes
+    let bowlId = null;
+    function scheduleBowl() {
+        if (!master.context || master.context.state === 'closed') return;
+        const t = ctx.currentTime;
+        const freq = [272.2, 408.3, 544.4][Math.floor(Math.random() * 3)];
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.04, t + 0.3);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 6);
+        o.connect(g); g.connect(reverb);
+        o.start(t); o.stop(t + 6);
+        bowlId = setTimeout(scheduleBowl, 6000 + Math.random() * 10000);
+    }
+    bowlId = setTimeout(scheduleBowl, 3000);
+
+    // Breathing LFO
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.04;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.02;
+    lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start(); oscs.push(lfo);
+
+    return () => {
+        if (bowlId) clearTimeout(bowlId);
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { n.stop(); } catch(e) {}
         master.disconnect();
     };
 }
@@ -1298,10 +1348,7 @@ function updateSessionDisplay() {
     }
 
     const totalSecs = Math.ceil(remaining / 1000);
-    const m = Math.floor(totalSecs / 60);
-    const s = totalSecs % 60;
-    sessionTimeLeft.textContent =
-        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    sessionTimeLeft.textContent = formatTime(totalSecs);
 
     if (totalSecs <= 30) {
         sessionBar.classList.add('warning');
@@ -1333,6 +1380,7 @@ function fireSessionAlarm() {
         itemActive = false;
     }
 
+    stopItemTimer();
     stopMusic();
 
     // Show session complete banner in the exercise area
@@ -1354,6 +1402,42 @@ function stopSessionTimer() {
     sessionEndTime = null;
     sessionBar.classList.add('hidden');
     sessionBar.classList.remove('warning');
+}
+
+// ---- Item Timer ----
+function formatTime(totalSecs) {
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function startItemTimer() {
+    stopItemTimer();
+    const mins = parseInt(itemMinutesInput.value, 10) || 3;
+    itemEndTime = Date.now() + mins * 60000;
+    itemTimeLeft.classList.remove('hidden');
+    itemTimeLeft.textContent = formatTime(mins * 60);
+    itemTickId = setInterval(() => {
+        const left = Math.max(0, Math.round((itemEndTime - Date.now()) / 1000));
+        itemTimeLeft.textContent = formatTime(left);
+        if (left <= 0) {
+            stopItemTimer();
+            if (itemActive) {
+                // Time's up for this item — auto-skip
+                speak('Time is up for this item.');
+                skipExercise();
+            }
+        }
+    }, 500);
+}
+
+function stopItemTimer() {
+    if (itemTickId) {
+        clearInterval(itemTickId);
+        itemTickId = null;
+    }
+    itemEndTime = null;
+    itemTimeLeft.classList.add('hidden');
 }
 
 // ---- Exercise Flow ----
@@ -1428,7 +1512,9 @@ function showExercise() {
 
     itemActive = true;
     lastGuessDistance = null;
+    llmPending = false;
     updateToggleModeButton();
+    startItemTimer();
     startListening();
 }
 
@@ -1467,6 +1553,8 @@ function startListening() {
 }
 
 function processGuess(transcript) {
+    if (llmPending) return; // Don't process while waiting for LLM
+
     const raw = transcript.trim();
 
     let guess = raw.toLowerCase().trim()
@@ -1479,13 +1567,44 @@ function processGuess(transcript) {
     if (/\b(open|done|give up|i'?m ready|show me|ready|reveal|finished)\b/.test(lowerRaw)) {
         playReadyTone();
         speak('Open your eyes and mark it.');
-        lastHeard.textContent = 'Open your eyes and tap Exact or Close.';
+        lastHeard.textContent = 'Open your eyes and tap Exact, Close, or No.';
         return;
     }
 
+    // LLM-powered modes
+    if (feedbackMode === 'hotcold' || feedbackMode === 'guided') {
+        llmPending = true;
+        lastHeard.textContent = `"${raw}" — thinking...`;
+        llmEvaluate(guess, currentAnswer[0], feedbackMode).then(result => {
+            llmPending = false;
+            if (!itemActive) return; // Exercise ended while waiting
+
+            if (result) {
+                const msg = result.message || 'Keep trying.';
+                if (result.rating === 'exact' || result.rating === 'close') {
+                    playCorrectSound();
+                    speak(msg + ' Open your eyes and mark it.');
+                    lastHeard.textContent = `"${raw}" — ${msg} Open your eyes and mark it.`;
+                } else {
+                    playTryAgainSound();
+                    speak(msg);
+                    lastHeard.textContent = `"${raw}" — ${msg}`;
+                }
+            } else {
+                // LLM failed, fall back to simple mode
+                const phrase = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
+                tryAgainIndex++;
+                playTryAgainSound();
+                speak(phrase);
+                lastHeard.textContent = `"${raw}" — ${phrase}`;
+            }
+        });
+        return;
+    }
+
+    // Non-LLM modes: use local semantic distance
     const dist = getSemanticDistance(guess, currentAnswer[0]);
 
-    // Perception layer — universal across all feedback modes
     let perception = null;
     if (dist <= 1) {
         perception = "You got it! Open your eyes and mark it.";
@@ -1495,24 +1614,8 @@ function processGuess(transcript) {
         playCorrectSound();
     }
 
-    // Feedback mode layer (for non-perception guesses)
     let feedback = null;
-    if (feedbackMode === 'hotcold') {
-        let label;
-        if (dist <= 1) label = 'Burning hot!';
-        else if (dist <= 3) label = 'Warm!';
-        else if (dist <= 5) label = 'Cool.';
-        else label = 'Cold.';
-
-        if (lastGuessDistance !== null) {
-            if (dist < lastGuessDistance) label = 'Getting warmer! ' + label;
-            else if (dist > lastGuessDistance) label = 'Getting colder... ' + label;
-        }
-        lastGuessDistance = dist;
-        feedback = label;
-    } else if (feedbackMode === 'hints') {
-        feedback = getHint(guess, currentAnswer);
-    } else if (feedbackMode === 'spiritual') {
+    if (feedbackMode === 'spiritual') {
         feedback = SPIRITUAL_HINTS[Math.floor(Math.random() * SPIRITUAL_HINTS.length)];
     } else if (feedbackMode === 'custom' && customHints.length > 0) {
         feedback = customHints[Math.floor(Math.random() * customHints.length)];
@@ -1523,9 +1626,7 @@ function processGuess(transcript) {
         tryAgainIndex++;
     }
 
-    // Combine: perception overrides for close, otherwise use feedback
     const message = perception ? perception : feedback;
-
     if (!perception) playTryAgainSound();
 
     speak(message);
@@ -1536,6 +1637,7 @@ function finishItem(type) {
     trackEvent(type);
     exerciseActive = false;
     itemActive = false;
+    stopItemTimer();
     if (recognition) {
         recognition.abort();
         recognition = null;
@@ -1588,6 +1690,7 @@ function goToSettings() {
     }
     speechSynthesis.cancel();
     stopSessionTimer();
+    stopItemTimer();
     stopMusic();
     exitBtn.classList.add('hidden');
     // Remove session complete banner if present
@@ -1614,6 +1717,7 @@ function skipExercise() {
         trackEvent('gaveup');
         itemActive = false;
     }
+    stopItemTimer();
     exerciseActive = false;
     if (recognition) {
         recognition.abort();
@@ -1641,6 +1745,8 @@ function handleKeyboard(e) {
 
 // ---- Init ----
 function init() {
+    initGate();
+
     if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
         alert('Speech Recognition is not supported in this browser.\nPlease use Chrome or Edge.');
     }
@@ -1654,7 +1760,11 @@ function init() {
     if (savedTheme) applyTheme(savedTheme);
 
     const savedFeedbackMode = localStorage.getItem('thirdeye-feedbackMode');
-    if (savedFeedbackMode) {
+    if (savedFeedbackMode === 'hints') {
+        // Migrate old 'hints' mode (removed) to 'simple'
+        localStorage.setItem('thirdeye-feedbackMode', 'simple');
+    }
+    if (savedFeedbackMode && savedFeedbackMode !== 'hints') {
         feedbackMode = savedFeedbackMode;
         feedbackModeSelect.value = savedFeedbackMode;
     }
