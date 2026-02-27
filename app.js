@@ -75,7 +75,7 @@ async function llmEvaluate(guess, answer, modeType) {
     if (!apiKey) return null;
     let userPrompt;
     if (modeType === 'guided') {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception AND explain what they're sensing correctly (if anything). In your message, hint at what aspect of their perception connects to the answer without revealing the answer itself.`;
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception AND guide them closer. Tell them what they're getting right (shape, color, feeling, category) and gently nudge them toward the answer without saying the word. For example: "You're picking up the shape — think rounder" or "Right category! It's something smaller." Always give them something to work with for their next try.`;
     } else {
         userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate their perception. Give brief hot/cold feedback without revealing the answer.`;
     }
@@ -105,7 +105,7 @@ async function llmEvaluate(guess, answer, modeType) {
 }
 
 // ---- Configuration ----
-const COUNTDOWN_SECONDS = 4;
+const COUNTDOWN_SECONDS = 3;
 
 const WORDS = [
     'love', 'peace', 'fire', 'water', 'earth', 'sky', 'sun', 'moon',
@@ -415,7 +415,7 @@ function getSemanticDistance(guess, answer) {
 // ---- State ----
 let mode = 'words';
 
-let feedbackMode = 'simple';
+let feedbackMode = 'guided';
 let bgMusicType = 'none';
 let theme = 'light';
 let trackingEnabled = true;
