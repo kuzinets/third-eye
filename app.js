@@ -136,6 +136,61 @@ const RELATED_WORDS = {
     piano: { words: ['organ', 'synth', 'keys'], hint: 'Black and white keys!' },
 };
 
+// Semantic groups for hot/cold distance (includes answer words + common guesses)
+const WORD_GROUPS = {
+    precious: ['gold', 'silver', 'diamond', 'pearl', 'emerald', 'crystal', 'crown', 'gem', 'jewel', 'treasure', 'ruby', 'sapphire', 'platinum', 'metal', 'ring', 'necklace', 'bronze', 'copper', 'iron'],
+    celestial: ['sun', 'moon', 'star', 'light', 'sunrise', 'horizon', 'shadow', 'eclipse', 'dawn', 'dusk', 'twilight', 'sky', 'cosmos', 'galaxy', 'constellation', 'space', 'night', 'day'],
+    water: ['water', 'river', 'ocean', 'rain', 'wave', 'island', 'drop', 'sea', 'lake', 'stream', 'pond', 'waterfall', 'tide', 'splash', 'flood'],
+    fire_heat: ['fire', 'flame', 'candle', 'lantern', 'torch', 'blaze', 'burn', 'heat', 'spark', 'ember', 'smoke', 'ash'],
+    weather: ['storm', 'thunder', 'cloud', 'snow', 'breeze', 'wind', 'rain', 'lightning', 'fog', 'mist', 'hurricane', 'tornado', 'hail', 'frost'],
+    plants: ['tree', 'forest', 'garden', 'rose', 'lotus', 'orchid', 'flower', 'leaf', 'branch', 'root', 'seed', 'plant', 'bush', 'vine', 'petal', 'grass', 'bloom', 'blossom', 'cactus'],
+    animals: ['bird', 'fish', 'wolf', 'lion', 'dolphin', 'tiger', 'eagle', 'falcon', 'phoenix', 'dragon', 'feather', 'bear', 'snake', 'horse', 'cat', 'dog', 'whale', 'shark', 'owl', 'fox', 'monkey', 'elephant', 'cow', 'frog', 'turtle', 'butterfly', 'bee', 'octopus', 'penguin', 'duck', 'tortoise', 'creature', 'animal', 'beast', 'wing', 'paw', 'claw'],
+    emotion: ['love', 'peace', 'hope', 'joy', 'dream', 'heart', 'harmony', 'spirit', 'happiness', 'bliss', 'calm', 'serenity', 'faith', 'grace', 'soul', 'compassion', 'kindness'],
+    abstract: ['power', 'magic', 'time', 'truth', 'wisdom', 'nature', 'journey', 'dance', 'music', 'energy', 'force', 'fate', 'destiny', 'mystery', 'secret'],
+    structure: ['home', 'temple', 'tower', 'bridge', 'door', 'gate', 'wall', 'castle', 'house', 'building', 'palace', 'church', 'arch', 'fortress'],
+    tools: ['key', 'bell', 'mirror', 'anchor', 'compass', 'book', 'pencil', 'hammer', 'clock', 'alarm', 'lantern', 'lock', 'chain', 'rope', 'shield', 'sword'],
+    earth: ['earth', 'stone', 'mountain', 'volcano', 'rock', 'sand', 'dirt', 'cave', 'cliff', 'canyon', 'ground', 'dust', 'mud', 'boulder', 'pebble'],
+    food: ['honey', 'apple', 'banana', 'grapes', 'strawberry', 'pizza', 'fruit', 'sugar', 'sweet', 'cherry', 'orange', 'peach', 'mango', 'berry', 'cake', 'bread'],
+    transport: ['car', 'rocket', 'airplane', 'bicycle', 'boat', 'ship', 'plane', 'bike', 'train', 'bus', 'sailboat', 'helicopter', 'truck', 'vehicle'],
+    color: ['rainbow', 'red', 'blue', 'green', 'yellow', 'purple', 'orange', 'white', 'black', 'pink', 'violet', 'indigo', 'crimson', 'scarlet'],
+    sound: ['music', 'bell', 'guitar', 'piano', 'drum', 'song', 'melody', 'rhythm', 'note', 'chord', 'tune', 'harmony', 'keyboard', 'instrument'],
+    sport: ['basketball', 'soccer', 'football', 'ball', 'game', 'goal', 'score', 'team', 'play'],
+};
+
+function getSemanticDistance(guess, answer) {
+    const g = guess.toLowerCase();
+    const a = answer.toLowerCase();
+    if (g === a) return 0;
+
+    // Near-spelling match
+    const lev = levenshtein(g, a);
+    if (lev <= 1) return 1;
+    if (lev <= 2) return 2;
+
+    // Check RELATED_WORDS (for images — very close semantic match)
+    const related = RELATED_WORDS[a];
+    if (related && related.words.includes(g)) return 2;
+
+    // Check shared semantic groups
+    const gGroups = [];
+    const aGroups = [];
+    for (const [group, words] of Object.entries(WORD_GROUPS)) {
+        if (words.includes(g)) gGroups.push(group);
+        if (words.includes(a)) aGroups.push(group);
+    }
+    const shared = gGroups.filter(grp => aGroups.includes(grp));
+    if (shared.length > 0) return 3;
+
+    // Both have groups but none shared — at least they're known words
+    if (gGroups.length > 0 && aGroups.length > 0) return 6;
+
+    // Unknown guess — fall back to normalized character similarity
+    const maxLen = Math.max(g.length, a.length);
+    if (lev / maxLen < 0.5) return 5;
+
+    return 8;
+}
+
 // ---- State ----
 let mode = 'words';
 let displayMode = 'standard';
@@ -1545,22 +1600,19 @@ function processGuess(transcript) {
         let feedback = null;
 
         if (feedbackMode === 'hotcold') {
-            const answer = currentAnswer[0].toLowerCase();
-            const dist = levenshtein(guess, answer);
-            if (lastGuessDistance === null) {
-                if (dist <= 1) feedback = 'Burning hot!';
-                else if (dist <= 3) feedback = 'Warm...';
-                else feedback = 'Cold.';
-            } else if (dist < lastGuessDistance) {
-                if (dist <= 1) feedback = 'Burning hot!';
-                else if (dist <= 3) feedback = 'Getting warmer!';
-                else feedback = 'Warmer...';
-            } else if (dist > lastGuessDistance) {
-                feedback = 'Colder...';
-            } else {
-                feedback = 'Same distance.';
+            const dist = getSemanticDistance(guess, currentAnswer[0]);
+            let label;
+            if (dist <= 1) label = 'Burning hot!';
+            else if (dist <= 3) label = 'Warm!';
+            else if (dist <= 5) label = 'Cool.';
+            else label = 'Cold.';
+
+            if (lastGuessDistance !== null) {
+                if (dist < lastGuessDistance) label = 'Getting warmer! ' + label;
+                else if (dist > lastGuessDistance) label = 'Getting colder... ' + label;
             }
             lastGuessDistance = dist;
+            feedback = label;
         } else if (feedbackMode === 'hints') {
             feedback = getHint(guess, currentAnswer);
         } else if (feedbackMode === 'spiritual') {
