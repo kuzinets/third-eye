@@ -1584,10 +1584,14 @@ function processGuess(transcript) {
 
             if (result) {
                 const msg = result.message || 'Keep trying.';
-                if (result.rating === 'exact' || result.rating === 'close') {
+                if (result.rating === 'exact') {
                     playCorrectSound();
                     speak(msg + ' Open your eyes and mark it.');
                     lastHeard.textContent = `"${raw}" — ${msg} Open your eyes and mark it.`;
+                } else if (result.rating === 'close') {
+                    playCorrectSound();
+                    speak(msg);
+                    lastHeard.textContent = `"${raw}" — ${msg}`;
                 } else {
                     playTryAgainSound();
                     speak(msg);
