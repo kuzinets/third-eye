@@ -136,25 +136,132 @@ const RELATED_WORDS = {
     piano: { words: ['organ', 'synth', 'keys'], hint: 'Black and white keys!' },
 };
 
-// Semantic groups for hot/cold distance (includes answer words + common guesses)
-const WORD_GROUPS = {
-    precious: ['gold', 'silver', 'diamond', 'pearl', 'emerald', 'crystal', 'crown', 'gem', 'jewel', 'treasure', 'ruby', 'sapphire', 'platinum', 'metal', 'ring', 'necklace', 'bronze', 'copper', 'iron'],
-    celestial: ['sun', 'moon', 'star', 'light', 'sunrise', 'horizon', 'shadow', 'eclipse', 'dawn', 'dusk', 'twilight', 'sky', 'cosmos', 'galaxy', 'constellation', 'space', 'night', 'day'],
-    water: ['water', 'river', 'ocean', 'rain', 'wave', 'island', 'drop', 'sea', 'lake', 'stream', 'pond', 'waterfall', 'tide', 'splash', 'flood'],
-    fire_heat: ['fire', 'flame', 'candle', 'lantern', 'torch', 'blaze', 'burn', 'heat', 'spark', 'ember', 'smoke', 'ash'],
-    weather: ['storm', 'thunder', 'cloud', 'snow', 'breeze', 'wind', 'rain', 'lightning', 'fog', 'mist', 'hurricane', 'tornado', 'hail', 'frost'],
-    plants: ['tree', 'forest', 'garden', 'rose', 'lotus', 'orchid', 'flower', 'leaf', 'branch', 'root', 'seed', 'plant', 'bush', 'vine', 'petal', 'grass', 'bloom', 'blossom', 'cactus'],
-    animals: ['bird', 'fish', 'wolf', 'lion', 'dolphin', 'tiger', 'eagle', 'falcon', 'phoenix', 'dragon', 'feather', 'bear', 'snake', 'horse', 'cat', 'dog', 'whale', 'shark', 'owl', 'fox', 'monkey', 'elephant', 'cow', 'frog', 'turtle', 'butterfly', 'bee', 'octopus', 'penguin', 'duck', 'tortoise', 'creature', 'animal', 'beast', 'wing', 'paw', 'claw'],
-    emotion: ['love', 'peace', 'hope', 'joy', 'dream', 'heart', 'harmony', 'spirit', 'happiness', 'bliss', 'calm', 'serenity', 'faith', 'grace', 'soul', 'compassion', 'kindness'],
-    abstract: ['power', 'magic', 'time', 'truth', 'wisdom', 'nature', 'journey', 'dance', 'music', 'energy', 'force', 'fate', 'destiny', 'mystery', 'secret'],
-    structure: ['home', 'temple', 'tower', 'bridge', 'door', 'gate', 'wall', 'castle', 'house', 'building', 'palace', 'church', 'arch', 'fortress'],
-    tools: ['key', 'bell', 'mirror', 'anchor', 'compass', 'book', 'pencil', 'hammer', 'clock', 'alarm', 'lantern', 'lock', 'chain', 'rope', 'shield', 'sword'],
-    earth: ['earth', 'stone', 'mountain', 'volcano', 'rock', 'sand', 'dirt', 'cave', 'cliff', 'canyon', 'ground', 'dust', 'mud', 'boulder', 'pebble'],
-    food: ['honey', 'apple', 'banana', 'grapes', 'strawberry', 'pizza', 'fruit', 'sugar', 'sweet', 'cherry', 'orange', 'peach', 'mango', 'berry', 'cake', 'bread'],
-    transport: ['car', 'rocket', 'airplane', 'bicycle', 'boat', 'ship', 'plane', 'bike', 'train', 'bus', 'sailboat', 'helicopter', 'truck', 'vehicle'],
-    color: ['rainbow', 'red', 'blue', 'green', 'yellow', 'purple', 'orange', 'white', 'black', 'pink', 'violet', 'indigo', 'crimson', 'scarlet'],
-    sound: ['music', 'bell', 'guitar', 'piano', 'drum', 'song', 'melody', 'rhythm', 'note', 'chord', 'tune', 'harmony', 'keyboard', 'instrument'],
-    sport: ['basketball', 'soccer', 'football', 'ball', 'game', 'goal', 'score', 'team', 'play'],
+// "Close" words per answer — things you'd say if your intuition is seeing it.
+// HOT = you're perceiving it. The word doesn't matter, the vision does.
+const CLOSE_WORDS = {
+    // ---- WORDS list ----
+    love: ['heart', 'romance', 'passion', 'affection', 'caring', 'devotion', 'warmth', 'embrace', 'kiss', 'adore'],
+    peace: ['calm', 'quiet', 'silence', 'serene', 'tranquil', 'harmony', 'still', 'rest', 'gentle', 'zen'],
+    fire: ['flame', 'burn', 'blaze', 'heat', 'hot', 'ember', 'torch', 'inferno', 'spark', 'bonfire', 'campfire'],
+    water: ['liquid', 'wet', 'fluid', 'aqua', 'rain', 'drop', 'splash', 'pour', 'flow', 'stream', 'blue'],
+    earth: ['ground', 'soil', 'dirt', 'land', 'mud', 'terrain', 'planet', 'world', 'globe', 'clay'],
+    sky: ['blue', 'above', 'heaven', 'air', 'atmosphere', 'clouds', 'ceiling', 'up', 'overhead'],
+    sun: ['bright', 'solar', 'sunshine', 'sunny', 'daylight', 'warm', 'yellow', 'glow', 'ray', 'beam', 'light'],
+    moon: ['lunar', 'crescent', 'night', 'moonlight', 'full', 'half', 'glow', 'silver', 'dark'],
+    star: ['twinkle', 'sparkle', 'shine', 'stellar', 'bright', 'night', 'sky', 'constellation', 'glitter', 'point'],
+    tree: ['wood', 'trunk', 'branch', 'leaf', 'oak', 'pine', 'forest', 'bark', 'roots', 'plant', 'timber', 'log'],
+    river: ['stream', 'creek', 'flow', 'water', 'current', 'brook', 'canal', 'flowing', 'bank'],
+    ocean: ['sea', 'water', 'waves', 'deep', 'marine', 'blue', 'pacific', 'atlantic', 'vast', 'tide'],
+    rain: ['water', 'drops', 'wet', 'shower', 'drizzle', 'pour', 'storm', 'falling', 'umbrella', 'downpour'],
+    wind: ['breeze', 'blow', 'air', 'gust', 'gale', 'draft', 'breezy', 'windy', 'blowing'],
+    light: ['bright', 'glow', 'shine', 'lamp', 'beam', 'ray', 'radiance', 'illumination', 'luminous', 'sun', 'bulb'],
+    gold: ['golden', 'yellow', 'metal', 'silver', 'shiny', 'treasure', 'precious', 'rich', 'gilt', 'ore', 'bar', 'coin', 'bronze', 'copper'],
+    hope: ['wish', 'faith', 'believe', 'dream', 'optimism', 'pray', 'trust', 'expect', 'aspire'],
+    joy: ['happy', 'happiness', 'glad', 'delight', 'bliss', 'cheerful', 'elation', 'pleasure', 'smile', 'laugh'],
+    dream: ['sleep', 'vision', 'imagine', 'fantasy', 'wish', 'hope', 'night', 'cloud', 'floating'],
+    heart: ['love', 'beat', 'red', 'pulse', 'valentine', 'chest', 'cardiac', 'core', 'soul', 'warm'],
+    dance: ['move', 'rhythm', 'sway', 'ballet', 'step', 'spin', 'twirl', 'groove', 'salsa', 'waltz', 'music'],
+    book: ['read', 'pages', 'novel', 'story', 'text', 'library', 'chapter', 'volume', 'words', 'literature', 'reading'],
+    door: ['gate', 'entrance', 'entry', 'exit', 'opening', 'doorway', 'portal', 'knock', 'handle', 'open', 'close'],
+    key: ['lock', 'open', 'unlock', 'door', 'metal', 'secret', 'answer', 'solution', 'keyhole'],
+    home: ['house', 'shelter', 'dwelling', 'family', 'roof', 'residence', 'apartment', 'building', 'place', 'comfort', 'room'],
+    bird: ['fly', 'wing', 'feather', 'nest', 'beak', 'sparrow', 'robin', 'crow', 'songbird', 'chirp', 'tweet'],
+    fish: ['swim', 'water', 'fin', 'scale', 'ocean', 'sea', 'aquarium', 'pond', 'salmon', 'trout', 'catch'],
+    wolf: ['dog', 'howl', 'pack', 'wild', 'grey', 'predator', 'canine', 'coyote', 'fangs', 'hunt', 'hound'],
+    lion: ['king', 'mane', 'roar', 'pride', 'jungle', 'cat', 'fierce', 'tiger', 'beast', 'leo', 'simba', 'courage', 'brave'],
+    rose: ['flower', 'red', 'petal', 'thorn', 'bloom', 'garden', 'bouquet', 'pink', 'blossom', 'romance', 'beautiful'],
+    bell: ['ring', 'chime', 'ding', 'sound', 'toll', 'church', 'jingle', 'alarm', 'gong'],
+    crown: ['king', 'queen', 'royal', 'throne', 'prince', 'princess', 'reign', 'tiara', 'jewel', 'head', 'ruler'],
+    flame: ['fire', 'burn', 'hot', 'candle', 'blaze', 'torch', 'ember', 'heat', 'spark', 'flicker', 'glow'],
+    stone: ['rock', 'pebble', 'boulder', 'hard', 'mineral', 'gravel', 'cobble', 'granite', 'marble', 'solid', 'heavy'],
+    cloud: ['sky', 'white', 'fluffy', 'rain', 'fog', 'mist', 'float', 'weather', 'soft', 'puffy', 'grey'],
+    snow: ['cold', 'white', 'ice', 'winter', 'frost', 'freeze', 'flake', 'blizzard', 'ski', 'christmas', 'frozen'],
+    storm: ['rain', 'thunder', 'lightning', 'wind', 'tempest', 'hurricane', 'wild', 'fierce', 'dark', 'violent', 'cyclone'],
+    wave: ['ocean', 'sea', 'water', 'surf', 'tide', 'ripple', 'crash', 'beach', 'swell', 'curl'],
+    truth: ['honest', 'real', 'true', 'fact', 'genuine', 'sincere', 'pure', 'authentic', 'correct', 'right'],
+    time: ['clock', 'hour', 'minute', 'second', 'watch', 'tick', 'past', 'future', 'present', 'moment', 'eternal'],
+    spirit: ['soul', 'ghost', 'energy', 'essence', 'divine', 'holy', 'sacred', 'aura', 'inner', 'presence'],
+    music: ['song', 'melody', 'tune', 'rhythm', 'sound', 'notes', 'harmony', 'sing', 'instrument', 'band', 'play'],
+    wisdom: ['wise', 'knowledge', 'smart', 'sage', 'insight', 'understanding', 'intelligence', 'learn', 'enlighten'],
+    power: ['strong', 'strength', 'force', 'energy', 'mighty', 'powerful', 'muscle', 'electric', 'charge'],
+    nature: ['natural', 'earth', 'green', 'wild', 'outdoor', 'forest', 'organic', 'trees', 'plants', 'life'],
+    magic: ['spell', 'wizard', 'witch', 'wand', 'sorcery', 'enchant', 'mystical', 'trick', 'illusion', 'supernatural'],
+    shadow: ['dark', 'shade', 'silhouette', 'darkness', 'dim', 'black', 'outline', 'ghost', 'night', 'grey'],
+    mirror: ['reflect', 'reflection', 'glass', 'image', 'self', 'look', 'see', 'shiny', 'surface'],
+    crystal: ['clear', 'glass', 'gem', 'transparent', 'quartz', 'sparkle', 'ice', 'pure', 'shiny', 'diamond', 'jewel'],
+    temple: ['church', 'shrine', 'sacred', 'holy', 'worship', 'prayer', 'mosque', 'spiritual', 'ancient', 'pillar'],
+    lotus: ['flower', 'water', 'lily', 'petal', 'bloom', 'pink', 'zen', 'buddha', 'pond', 'meditation', 'sacred'],
+    thunder: ['lightning', 'storm', 'loud', 'boom', 'rumble', 'crash', 'sky', 'rain', 'electric', 'roar'],
+    feather: ['bird', 'light', 'soft', 'wing', 'fly', 'quill', 'plume', 'fluffy', 'float', 'delicate', 'tickle'],
+    diamond: ['gem', 'jewel', 'sparkle', 'crystal', 'ring', 'precious', 'stone', 'brilliant', 'shiny', 'carbon', 'rock'],
+    candle: ['flame', 'light', 'wax', 'fire', 'glow', 'wick', 'burn', 'lamp', 'lantern', 'bright', 'dark'],
+    forest: ['trees', 'woods', 'jungle', 'green', 'nature', 'wild', 'dense', 'dark', 'path', 'trail'],
+    island: ['beach', 'ocean', 'sea', 'tropical', 'land', 'water', 'palm', 'paradise', 'remote', 'shore', 'sand'],
+    sunrise: ['dawn', 'morning', 'sun', 'rise', 'early', 'orange', 'horizon', 'daybreak', 'light', 'sky', 'golden'],
+    horizon: ['far', 'distance', 'sky', 'line', 'sunset', 'sunrise', 'edge', 'view', 'panorama', 'vast', 'end'],
+    breeze: ['wind', 'air', 'gentle', 'cool', 'blow', 'soft', 'light', 'draft', 'fresh', 'breezy', 'mild'],
+    harmony: ['peace', 'balance', 'music', 'accord', 'together', 'unity', 'melody', 'chord', 'sync', 'agreement'],
+    journey: ['travel', 'trip', 'voyage', 'path', 'road', 'adventure', 'quest', 'walk', 'expedition', 'way', 'route'],
+    phoenix: ['fire', 'bird', 'rebirth', 'rise', 'flame', 'myth', 'fly', 'ash', 'legend', 'immortal', 'wings'],
+    dragon: ['fire', 'fly', 'beast', 'myth', 'wings', 'scales', 'lizard', 'serpent', 'breathe', 'medieval', 'monster'],
+    falcon: ['bird', 'hawk', 'eagle', 'fly', 'fast', 'hunt', 'wing', 'prey', 'raptor', 'soar', 'swift'],
+    dolphin: ['ocean', 'sea', 'swim', 'water', 'fin', 'jump', 'smart', 'marine', 'whale', 'playful', 'fish'],
+    tiger: ['stripes', 'cat', 'jungle', 'wild', 'fierce', 'orange', 'predator', 'lion', 'big', 'hunt', 'roar'],
+    eagle: ['bird', 'fly', 'soar', 'wing', 'freedom', 'hawk', 'bald', 'sky', 'prey', 'majestic', 'america'],
+    pearl: ['white', 'round', 'oyster', 'jewel', 'gem', 'necklace', 'ocean', 'precious', 'shiny', 'shell', 'bead'],
+    emerald: ['green', 'gem', 'jewel', 'stone', 'precious', 'crystal', 'color', 'jade', 'sparkle', 'oz'],
+    silver: ['metal', 'grey', 'shiny', 'gold', 'chrome', 'steel', 'platinum', 'coin', 'ring', 'second', 'mirror'],
+    honey: ['sweet', 'bee', 'gold', 'golden', 'sticky', 'sugar', 'nectar', 'syrup', 'hive', 'bear', 'jar'],
+    orchid: ['flower', 'purple', 'bloom', 'petal', 'plant', 'exotic', 'beautiful', 'tropical', 'delicate', 'pink'],
+    garden: ['flower', 'plant', 'green', 'grow', 'nature', 'yard', 'beautiful', 'soil', 'seed', 'bloom', 'park'],
+    bridge: ['cross', 'river', 'connect', 'span', 'road', 'arch', 'over', 'gap', 'path', 'structure', 'link'],
+    tower: ['tall', 'high', 'building', 'castle', 'top', 'climb', 'structure', 'spire', 'lookout', 'fortress'],
+    anchor: ['ship', 'boat', 'sea', 'ocean', 'heavy', 'hold', 'chain', 'metal', 'dock', 'harbor', 'port', 'sailor'],
+    compass: ['direction', 'north', 'south', 'navigate', 'map', 'guide', 'needle', 'east', 'west', 'point', 'travel'],
+    lantern: ['lamp', 'light', 'glow', 'candle', 'flame', 'bright', 'night', 'dark', 'carry', 'oil', 'illuminate', 'torch', 'flashlight'],
+    // ---- IMAGE answers ----
+    elephant: ['trunk', 'tusks', 'big', 'grey', 'large', 'mammoth', 'africa', 'heavy', 'jumbo', 'dumbo', 'animal'],
+    cow: ['bull', 'cattle', 'milk', 'farm', 'moo', 'calf', 'ox', 'beef', 'dairy', 'buffalo', 'animal'],
+    cat: ['kitten', 'kitty', 'meow', 'feline', 'purr', 'whiskers', 'pet', 'tabby', 'paws'],
+    dog: ['puppy', 'pup', 'canine', 'bark', 'pet', 'hound', 'woof', 'mutt', 'tail', 'fetch'],
+    horse: ['pony', 'stallion', 'mare', 'ride', 'gallop', 'foal', 'mane', 'hoof', 'equine', 'donkey', 'mule'],
+    bear: ['grizzly', 'polar', 'panda', 'fur', 'big', 'brown', 'honey', 'teddy', 'cub', 'wild'],
+    snake: ['serpent', 'slither', 'viper', 'cobra', 'python', 'reptile', 'hiss', 'scales', 'poison', 'venom'],
+    turtle: ['shell', 'slow', 'tortoise', 'reptile', 'sea', 'green', 'hard', 'swim'],
+    frog: ['green', 'jump', 'hop', 'toad', 'ribbit', 'pond', 'croak', 'amphibian', 'lily'],
+    butterfly: ['wings', 'fly', 'insect', 'beautiful', 'colorful', 'moth', 'flutter', 'caterpillar', 'monarch'],
+    bee: ['honey', 'buzz', 'sting', 'hive', 'yellow', 'insect', 'pollen', 'flower', 'wasp', 'bumble'],
+    octopus: ['tentacles', 'eight', 'arms', 'ocean', 'sea', 'squid', 'ink', 'underwater', 'legs'],
+    shark: ['teeth', 'fin', 'ocean', 'jaws', 'bite', 'predator', 'sea', 'dangerous', 'great', 'swim'],
+    whale: ['big', 'ocean', 'sea', 'blue', 'huge', 'swim', 'marine', 'fin', 'spout', 'mammal', 'humpback'],
+    owl: ['hoot', 'night', 'wise', 'bird', 'fly', 'eyes', 'nocturnal', 'feathers', 'hawk'],
+    fox: ['orange', 'red', 'cunning', 'sly', 'clever', 'wild', 'tail', 'wolf', 'dog', 'fur', 'vixen'],
+    penguin: ['ice', 'cold', 'bird', 'black', 'white', 'antarctic', 'waddle', 'swim', 'tuxedo', 'march'],
+    duck: ['quack', 'bird', 'swim', 'pond', 'water', 'waddle', 'feathers', 'bill', 'mallard', 'goose'],
+    monkey: ['ape', 'banana', 'climb', 'swing', 'tail', 'primate', 'gorilla', 'chimp', 'jungle', 'chimpanzee'],
+    rainbow: ['colors', 'arc', 'sky', 'rain', 'colorful', 'spectrum', 'seven', 'bright', 'beautiful'],
+    mountain: ['hill', 'peak', 'climb', 'tall', 'high', 'rock', 'summit', 'snow', 'range', 'top', 'everest'],
+    volcano: ['lava', 'erupt', 'mountain', 'fire', 'hot', 'explosion', 'magma', 'ash', 'smoke', 'eruption'],
+    cactus: ['desert', 'spike', 'prickly', 'thorn', 'plant', 'dry', 'green', 'needle', 'sand', 'hot', 'arid'],
+    flower: ['petal', 'bloom', 'garden', 'rose', 'beautiful', 'plant', 'blossom', 'bouquet', 'spring', 'colorful'],
+    apple: ['fruit', 'red', 'green', 'eat', 'tree', 'juice', 'pie', 'bite', 'crisp', 'sweet', 'food'],
+    banana: ['yellow', 'fruit', 'peel', 'monkey', 'tropical', 'sweet', 'curved', 'bunch', 'food'],
+    grapes: ['wine', 'purple', 'vine', 'fruit', 'bunch', 'green', 'grape', 'raisin', 'juicy'],
+    strawberry: ['red', 'berry', 'fruit', 'sweet', 'jam', 'pink', 'seed', 'cream', 'summer'],
+    pizza: ['food', 'cheese', 'slice', 'italian', 'pie', 'pepperoni', 'dough', 'round', 'eat', 'dinner'],
+    car: ['drive', 'vehicle', 'auto', 'road', 'wheel', 'ride', 'automobile', 'truck', 'motor', 'fast'],
+    rocket: ['space', 'fly', 'launch', 'fast', 'ship', 'spaceship', 'shuttle', 'nasa', 'blast', 'missile', 'moon'],
+    airplane: ['fly', 'plane', 'jet', 'sky', 'flight', 'wing', 'pilot', 'air', 'travel', 'airport', 'aircraft'],
+    bicycle: ['bike', 'ride', 'pedal', 'wheel', 'cycle', 'two', 'chain', 'handlebar', 'spoke', 'tricycle'],
+    boat: ['ship', 'sail', 'water', 'sea', 'float', 'vessel', 'row', 'canoe', 'yacht', 'sailboat', 'ocean'],
+    house: ['home', 'building', 'roof', 'door', 'room', 'shelter', 'live', 'family', 'apartment', 'dwelling'],
+    guitar: ['music', 'string', 'play', 'strum', 'instrument', 'rock', 'chord', 'acoustic', 'electric', 'ukulele', 'banjo'],
+    piano: ['keys', 'music', 'play', 'instrument', 'keyboard', 'black', 'white', 'note', 'organ', 'concert'],
+    basketball: ['ball', 'hoop', 'court', 'dribble', 'shoot', 'sport', 'game', 'slam', 'dunk', 'bounce', 'net'],
+    soccer: ['ball', 'kick', 'goal', 'field', 'football', 'sport', 'game', 'net', 'team', 'pitch'],
+    pencil: ['write', 'draw', 'pen', 'lead', 'sharp', 'paper', 'eraser', 'yellow', 'sketch', 'crayon'],
+    hammer: ['nail', 'tool', 'hit', 'bang', 'build', 'strike', 'wood', 'construction', 'mallet', 'pound'],
+    clock: ['time', 'tick', 'watch', 'hour', 'minute', 'alarm', 'hand', 'tock', 'round', 'second'],
 };
 
 function getSemanticDistance(guess, answer) {
@@ -165,28 +272,29 @@ function getSemanticDistance(guess, answer) {
     // Near-spelling match
     const lev = levenshtein(g, a);
     if (lev <= 1) return 1;
-    if (lev <= 2) return 2;
 
-    // Check RELATED_WORDS (for images — very close semantic match)
+    // Direct close-word match — "you're seeing it"
+    const closeWords = CLOSE_WORDS[a];
+    if (closeWords && closeWords.includes(g)) return 2;
+
+    // Check RELATED_WORDS (for images)
     const related = RELATED_WORDS[a];
     if (related && related.words.includes(g)) return 2;
 
-    // Check shared semantic groups
-    const gGroups = [];
-    const aGroups = [];
-    for (const [group, words] of Object.entries(WORD_GROUPS)) {
-        if (words.includes(g)) gGroups.push(group);
-        if (words.includes(a)) aGroups.push(group);
+    // Check if guess is a close word for ANY answer that shares a close-word with the real answer
+    // e.g. guess "bright" for answer "gold" — "bright" is close to "light", and "light" shares
+    // close-words with many luminous things. This catches indirect associations.
+    if (closeWords) {
+        for (const [otherAnswer, otherClose] of Object.entries(CLOSE_WORDS)) {
+            if (otherAnswer === a) continue;
+            if (otherClose.includes(g) && closeWords.some(w => otherClose.includes(w))) return 4;
+        }
     }
-    const shared = gGroups.filter(grp => aGroups.includes(grp));
-    if (shared.length > 0) return 3;
 
-    // Both have groups but none shared — at least they're known words
-    if (gGroups.length > 0 && aGroups.length > 0) return 6;
-
-    // Unknown guess — fall back to normalized character similarity
+    // Spelling similarity as last resort
+    if (lev <= 2) return 3;
     const maxLen = Math.max(g.length, a.length);
-    if (lev / maxLen < 0.5) return 5;
+    if (lev / maxLen < 0.4) return 5;
 
     return 8;
 }
