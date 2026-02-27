@@ -20,13 +20,6 @@
             <div class="timer-section">
                 <h3>Practice Settings</h3>
                 <div class="setting-row">
-                    <label for="display-mode">Display Mode</label>
-                    <select id="display-mode">
-                        <option value="standard">Standard</option>
-                        <option value="focus">Focus</option>
-                    </select>
-                </div>
-                <div class="setting-row">
                     <label for="feedback-mode">Feedback Mode</label>
                     <select id="feedback-mode">
                         <option value="simple">Simple</option>
@@ -155,16 +148,15 @@
             </div>
 
             <div id="judge-controls" class="judge-controls">
-                <button id="btn-exact" class="btn-judge btn-exact">Exact!</button>
-                <button id="btn-almost" class="btn-judge btn-almost">Close!</button>
-                <button id="btn-skip" class="btn-secondary btn-small">Skip</button>
+                <button id="btn-exact" class="btn-judge btn-exact">Exact</button>
+                <button id="btn-almost" class="btn-judge btn-almost">Close</button>
+                <button id="btn-no" class="btn-judge btn-no">No</button>
             </div>
 
             <div id="mid-session-controls">
+                <button id="btn-skip" class="btn-secondary btn-small">Skip</button>
                 <button id="btn-toggle-mode" class="btn-secondary btn-small">Switch to Images</button>
             </div>
-
-            <button id="btn-stop" class="btn-danger">Stop</button>
         </div>
 
         <!-- Result -->
@@ -178,17 +170,8 @@
         </div>
     </div>
 
-    <!-- Session Complete Overlay -->
-    <div id="session-overlay" class="session-overlay hidden">
-        <div class="overlay-content">
-            <h2>Session Complete</h2>
-            <p>Well done!</p>
-            <button id="btn-overlay-menu" class="btn-primary">Back to Menu</button>
-        </div>
-    </div>
-
-    <!-- Focus mode exit hotspot -->
-    <button id="focus-exit" class="focus-exit hidden" aria-label="Exit focus mode">&times;</button>
+    <!-- Exercise exit button -->
+    <button id="exit-btn" class="exit-btn hidden" aria-label="Back to menu">&times;</button>
 
     <script src="app.js"></script>
 </body>

@@ -312,7 +312,7 @@ function getSemanticDistance(guess, answer) {
 
 // ---- State ----
 let mode = 'words';
-let displayMode = 'standard';
+
 let feedbackMode = 'simple';
 let bgMusicType = 'none';
 let theme = 'light';
@@ -333,7 +333,7 @@ let sessionTickId = null;
 let selectedVoice = null;
 let stopMusicFn = null;
 let tryAgainIndex = 0;
-let sessionOverlayVisible = false;
+let sessionComplete = false;
 let itemActive = false;
 let activeInputStream = null;
 let selectedAudioInputId = 'default';
@@ -363,10 +363,9 @@ const displayContent = document.getElementById('display-content');
 const micIcon = document.getElementById('mic-icon');
 const listeningStatus = document.getElementById('listening-status');
 const lastHeard = document.getElementById('last-heard');
-const btnStop = document.getElementById('btn-stop');
-
 const btnExact = document.getElementById('btn-exact');
 const btnAlmost = document.getElementById('btn-almost');
+const btnNo = document.getElementById('btn-no');
 const btnSkip = document.getElementById('btn-skip');
 const btnToggleMode = document.getElementById('btn-toggle-mode');
 const resultBadge = document.getElementById('result-badge');
@@ -382,7 +381,6 @@ const sessionTimeLeft = document.getElementById('session-time-left');
 const voiceSelect = document.getElementById('voice-select');
 const btnVoiceTest = document.getElementById('btn-voice-test');
 
-const displayModeSelect = document.getElementById('display-mode');
 const feedbackModeSelect = document.getElementById('feedback-mode');
 const bgMusicSelect = document.getElementById('bg-music');
 const themeSelect = document.getElementById('theme-select');
@@ -393,9 +391,7 @@ const btnDashboardBack = document.getElementById('btn-dashboard-back');
 const dashboardToday = document.getElementById('dashboard-today');
 const dashboardTableContainer = document.getElementById('dashboard-table-container');
 
-const sessionOverlay = document.getElementById('session-overlay');
-const btnOverlayMenu = document.getElementById('btn-overlay-menu');
-const focusExit = document.getElementById('focus-exit');
+const exitBtn = document.getElementById('exit-btn');
 
 const audioInputSelect = document.getElementById('audio-input');
 const audioOutputSelect = document.getElementById('audio-output');
@@ -1072,13 +1068,6 @@ function applyTheme(t) {
     themeSelect.value = t;
 }
 
-// ---- Display Mode ----
-function setDisplayMode(dm) {
-    displayMode = dm;
-    localStorage.setItem('thirdeye-displayMode', dm);
-    displayModeSelect.value = dm;
-}
-
 // ---- Mode Toggle ----
 function setMode(newMode) {
     mode = newMode;
@@ -1105,11 +1094,18 @@ function saveStats(stats) {
 }
 
 function migrateDay(d) {
+    if (!d) return d;
     // Migrate old 'successes' field to 'exact'
-    if (d && 'successes' in d && !('exact' in d)) {
+    if ('successes' in d && !('exact' in d)) {
         d.exact = d.successes;
         d.close = 0;
         delete d.successes;
+    }
+    // Migrate old failuresTimeout/failuresGaveUp to 'no'
+    if (!('no' in d)) {
+        d.no = (d.failuresTimeout || 0) + (d.failuresGaveUp || 0);
+        delete d.failuresTimeout;
+        delete d.failuresGaveUp;
     }
     return d;
 }
@@ -1119,26 +1115,28 @@ function trackEvent(type) {
     const today = new Date().toISOString().split('T')[0];
     const stats = loadStats();
     if (!stats[today]) {
-        stats[today] = { sessions: 0, items: 0, exact: 0, close: 0, failuresTimeout: 0, failuresGaveUp: 0 };
+        stats[today] = { sessions: 0, items: 0, exact: 0, close: 0, no: 0 };
     }
     migrateDay(stats[today]);
     switch (type) {
         case 'session': stats[today].sessions++; break;
         case 'exact': stats[today].exact++; stats[today].items++; break;
         case 'close': stats[today].close++; stats[today].items++; break;
-        case 'timeout': stats[today].failuresTimeout++; stats[today].items++; break;
-        case 'gaveup': stats[today].failuresGaveUp++; stats[today].items++; break;
+        case 'no': stats[today].no++; stats[today].items++; break;
+        case 'timeout': stats[today].items++; stats[today].no++; break;
+        case 'gaveup': stats[today].items++; stats[today].no++; break;
     }
     saveStats(stats);
 }
 
 // ---- Dashboard ----
+function pct(n, total) { return total > 0 ? Math.round(n / total * 100) : 0; }
+
 function renderDashboard() {
     const stats = loadStats();
     const today = new Date().toISOString().split('T')[0];
-    const t = migrateDay(stats[today]) || { sessions: 0, items: 0, exact: 0, close: 0, failuresTimeout: 0, failuresGaveUp: 0 };
-    const hits = (t.exact || 0) + (t.close || 0);
-    const pct = t.items > 0 ? Math.round(hits / t.items * 100) : 0;
+    const t = migrateDay(stats[today]) || { sessions: 0, items: 0, exact: 0, close: 0, no: 0 };
+    const te = t.exact || 0, tc = t.close || 0, tn = t.no || 0;
 
     dashboardToday.innerHTML = `
         <div class="stats-today">
@@ -1146,9 +1144,9 @@ function renderDashboard() {
             <div class="stats-grid">
                 <div class="stat"><span class="stat-num">${t.sessions}</span><span class="stat-label">Sessions</span></div>
                 <div class="stat"><span class="stat-num">${t.items}</span><span class="stat-label">Items</span></div>
-                <div class="stat"><span class="stat-num">${t.exact || 0}</span><span class="stat-label">Exact</span></div>
-                <div class="stat"><span class="stat-num">${t.close || 0}</span><span class="stat-label">Close</span></div>
-                <div class="stat"><span class="stat-num">${pct}%</span><span class="stat-label">Success</span></div>
+                <div class="stat"><span class="stat-num">${te} (${pct(te, t.items)}%)</span><span class="stat-label">Exact</span></div>
+                <div class="stat"><span class="stat-num">${tc} (${pct(tc, t.items)}%)</span><span class="stat-label">Close</span></div>
+                <div class="stat"><span class="stat-num">${tn} (${pct(tn, t.items)}%)</span><span class="stat-label">No</span></div>
             </div>
         </div>`;
 
@@ -1166,15 +1164,14 @@ function renderDashboard() {
     }
 
     let html = `<table class="stats-table"><thead><tr>
-        <th>Date</th><th>Sessions</th><th>Items</th><th>Exact</th><th>Close</th><th>Timeout</th><th>Gave Up</th><th>%</th>
+        <th>Date</th><th>Sess</th><th>Items</th><th>Exact</th><th>Close</th><th>No</th>
     </tr></thead><tbody>`;
 
     dates.forEach(date => {
         const s = migrateDay(stats[date]);
         if (!s) return;
-        const hits = (s.exact || 0) + (s.close || 0);
-        const p = s.items > 0 ? Math.round(hits / s.items * 100) : 0;
-        html += `<tr><td>${date}</td><td>${s.sessions}</td><td>${s.items}</td><td>${s.exact || 0}</td><td>${s.close || 0}</td><td>${s.failuresTimeout}</td><td>${s.failuresGaveUp}</td><td>${p}%</td></tr>`;
+        const se = s.exact || 0, sc = s.close || 0, sn = s.no || 0;
+        html += `<tr><td>${date}</td><td>${s.sessions}</td><td>${s.items}</td><td>${se} (${pct(se, s.items)}%)</td><td>${sc} (${pct(sc, s.items)}%)</td><td>${sn} (${pct(sn, s.items)}%)</td></tr>`;
     });
 
     html += '</tbody></table>';
@@ -1318,9 +1315,10 @@ function fireSessionAlarm() {
     sessionBar.classList.add('hidden');
 
     playSessionAlarm();
-    speak('Session complete. Well done.');
+    speak('Session complete.');
 
     exerciseActive = false;
+    sessionComplete = true;
     if (countdownIntervalId) {
         clearInterval(countdownIntervalId);
         countdownIntervalId = null;
@@ -1336,8 +1334,16 @@ function fireSessionAlarm() {
     }
 
     stopMusic();
-    sessionOverlayVisible = true;
-    sessionOverlay.classList.remove('hidden');
+
+    // Show session complete banner in the exercise area
+    const existing = document.getElementById('session-complete-banner');
+    if (!existing) {
+        const banner = document.createElement('div');
+        banner.id = 'session-complete-banner';
+        banner.className = 'session-complete-banner';
+        banner.textContent = 'Session Complete';
+        exerciseArea.appendChild(banner);
+    }
 }
 
 function stopSessionTimer() {
@@ -1366,13 +1372,8 @@ function startExercise() {
         startMusic();
     }
 
-    // Show exit button (always, in all modes)
-    focusExit.classList.remove('hidden');
-
-    // Apply focus mode if selected
-    if (displayMode === 'focus') {
-        document.body.classList.add('focus-mode');
-    }
+    // Show exit button
+    exitBtn.classList.remove('hidden');
 
     // Activate selected audio input device
     if (selectedAudioInputId !== 'default') {
@@ -1546,18 +1547,22 @@ function finishItem(type) {
     if (type === 'exact') {
         playCorrectSound();
         speak(`It was ${answerText}. Well done.`);
-        resultBadge.textContent = '\u2713 Correct!';
+        resultBadge.textContent = '\u2713 Exact!';
         resultBadge.className = 'result-badge';
-    } else {
-        playTryAgainSound();
+    } else if (type === 'close') {
+        playCorrectSound();
         speak(`It was ${answerText}. Good perception.`);
         resultBadge.textContent = '\u2248 Close!';
         resultBadge.className = 'result-badge close-result';
+    } else {
+        playTryAgainSound();
+        speak(`It was ${answerText}.`);
+        resultBadge.textContent = '\u2717 No';
+        resultBadge.className = 'result-badge no-result';
     }
 
     showOnly(resultArea);
-    document.body.classList.remove('focus-mode');
-    focusExit.classList.add('hidden');
+    exitBtn.classList.add('hidden');
 
     if (mode === 'words') {
         resultContent.textContent = answerText;
@@ -1572,8 +1577,7 @@ function finishItem(type) {
 function goToSettings() {
     exerciseActive = false;
     itemActive = false;
-    sessionOverlayVisible = false;
-    sessionOverlay.classList.add('hidden');
+    sessionComplete = false;
     if (countdownIntervalId) {
         clearInterval(countdownIntervalId);
         countdownIntervalId = null;
@@ -1585,8 +1589,10 @@ function goToSettings() {
     speechSynthesis.cancel();
     stopSessionTimer();
     stopMusic();
-    document.body.classList.remove('focus-mode');
-    focusExit.classList.add('hidden');
+    exitBtn.classList.add('hidden');
+    // Remove session complete banner if present
+    const banner = document.getElementById('session-complete-banner');
+    if (banner) banner.remove();
     // Release audio input stream
     if (activeInputStream) {
         activeInputStream.getTracks().forEach(t => t.stop());
@@ -1619,14 +1625,6 @@ function skipExercise() {
 
 // ---- Keyboard Controls ----
 function handleKeyboard(e) {
-    if (sessionOverlayVisible) {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            goToSettings();
-        }
-        return;
-    }
-
     if (!exerciseActive) return;
 
     if (e.key === 'Escape') {
@@ -1654,12 +1652,6 @@ function init() {
     // Load persisted settings
     const savedTheme = localStorage.getItem('thirdeye-theme');
     if (savedTheme) applyTheme(savedTheme);
-
-    const savedDisplayMode = localStorage.getItem('thirdeye-displayMode');
-    if (savedDisplayMode) {
-        displayMode = savedDisplayMode;
-        displayModeSelect.value = savedDisplayMode;
-    }
 
     const savedFeedbackMode = localStorage.getItem('thirdeye-feedbackMode');
     if (savedFeedbackMode) {
@@ -1715,11 +1707,6 @@ function init() {
     btnImages.addEventListener('click', () => setMode('images'));
 
     // Settings dropdowns
-    displayModeSelect.addEventListener('change', () => {
-        displayMode = displayModeSelect.value;
-        localStorage.setItem('thirdeye-displayMode', displayMode);
-    });
-
     feedbackModeSelect.addEventListener('change', () => {
         feedbackMode = feedbackModeSelect.value;
         localStorage.setItem('thirdeye-feedbackMode', feedbackMode);
@@ -1751,13 +1738,13 @@ function init() {
 
     // Exercise
     btnStartExercise.addEventListener('click', startExercise);
-    btnStop.addEventListener('click', stopExercise);
     btnNewExercise.addEventListener('click', startExercise);
     btnBackMenu.addEventListener('click', goToSettings);
 
     // Self-judgment
     btnExact.addEventListener('click', () => { if (itemActive) finishItem('exact'); });
     btnAlmost.addEventListener('click', () => { if (itemActive) finishItem('close'); });
+    btnNo.addEventListener('click', () => { if (itemActive) finishItem('no'); });
     btnSkip.addEventListener('click', skipExercise);
     btnToggleMode.addEventListener('click', () => {
         setMode(mode === 'words' ? 'images' : 'words');
@@ -1770,11 +1757,8 @@ function init() {
     });
     btnDashboardBack.addEventListener('click', () => showOnly(settingsPanel));
 
-    // Session overlay
-    btnOverlayMenu.addEventListener('click', goToSettings);
-
-    // Exit button (works in all modes during exercise)
-    focusExit.addEventListener('click', stopExercise);
+    // Exit button
+    exitBtn.addEventListener('click', stopExercise);
 
     // Keyboard
     document.addEventListener('keydown', handleKeyboard);
