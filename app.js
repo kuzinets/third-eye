@@ -627,61 +627,359 @@ function createReverb(ctx, duration, decay) {
 }
 
 // ---- Background Music Generators ----
+// All based on brainwave entrainment research and sacred frequencies.
 
-// Om Drone: warm & breathy with sine/triangle oscillators
-function createOmDrone(ctx) {
+// Theta Binaural Beat (6 Hz) — deep meditation, intuition
+// Left ear 200Hz, right ear 206Hz. Brain perceives 6Hz difference.
+// REQUIRES HEADPHONES for binaural effect.
+function createThetaBinaural(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.15;
+    master.connect(ctx.destination);
+
+    const reverb = createReverb(ctx, 4, 1.5);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.3;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+
+    const oscs = [];
+
+    // Left ear: 200 Hz
+    const left = ctx.createOscillator();
+    left.type = 'sine';
+    left.frequency.value = 200;
+    const leftPan = ctx.createStereoPanner();
+    leftPan.pan.value = -1;
+    const leftGain = ctx.createGain();
+    leftGain.gain.value = 0.3;
+    left.connect(leftGain);
+    leftGain.connect(leftPan);
+    leftPan.connect(master);
+    left.start();
+    oscs.push(left);
+
+    // Right ear: 206 Hz (6 Hz theta difference)
+    const right = ctx.createOscillator();
+    right.type = 'sine';
+    right.frequency.value = 206;
+    const rightPan = ctx.createStereoPanner();
+    rightPan.pan.value = 1;
+    const rightGain = ctx.createGain();
+    rightGain.gain.value = 0.3;
+    right.connect(rightGain);
+    rightGain.connect(rightPan);
+    rightPan.connect(master);
+    right.start();
+    oscs.push(right);
+
+    // Gentle ambient bed — very soft pad for warmth
+    const pad = ctx.createOscillator();
+    pad.type = 'sine';
+    pad.frequency.value = 100;
+    const padGain = ctx.createGain();
+    padGain.gain.value = 0.04;
+    pad.connect(padGain);
+    padGain.connect(reverb);
+    pad.start();
+    oscs.push(pad);
+
+    // Slow breathing LFO on master
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.06;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.02;
+    lfo.connect(lfoGain);
+    lfoGain.connect(master.gain);
+    lfo.start();
+    oscs.push(lfo);
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        master.disconnect();
+    };
+}
+
+// Gamma Binaural Beat (40 Hz) — heightened awareness, perception
+// Left ear 200Hz, right ear 240Hz. Brain perceives 40Hz difference.
+// REQUIRES HEADPHONES for binaural effect.
+function createGammaBinaural(ctx) {
     const master = ctx.createGain();
     master.gain.value = 0.15;
     master.connect(ctx.destination);
 
     const reverb = createReverb(ctx, 3, 2);
     const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.4;
+    reverbGain.gain.value = 0.25;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+
+    const oscs = [];
+
+    // Left ear: 200 Hz
+    const left = ctx.createOscillator();
+    left.type = 'sine';
+    left.frequency.value = 200;
+    const leftPan = ctx.createStereoPanner();
+    leftPan.pan.value = -1;
+    const leftGain = ctx.createGain();
+    leftGain.gain.value = 0.25;
+    left.connect(leftGain);
+    leftGain.connect(leftPan);
+    leftPan.connect(master);
+    left.start();
+    oscs.push(left);
+
+    // Right ear: 240 Hz (40 Hz gamma difference)
+    const right = ctx.createOscillator();
+    right.type = 'sine';
+    right.frequency.value = 240;
+    const rightPan = ctx.createStereoPanner();
+    rightPan.pan.value = 1;
+    const rightGain = ctx.createGain();
+    rightGain.gain.value = 0.25;
+    right.connect(rightGain);
+    rightGain.connect(rightPan);
+    rightPan.connect(master);
+    right.start();
+    oscs.push(right);
+
+    // Soft sub pad
+    const pad = ctx.createOscillator();
+    pad.type = 'sine';
+    pad.frequency.value = 110;
+    const padGain = ctx.createGain();
+    padGain.gain.value = 0.03;
+    pad.connect(padGain);
+    padGain.connect(reverb);
+    pad.start();
+    oscs.push(pad);
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        master.disconnect();
+    };
+}
+
+// Alpha Isochronic Tones (10 Hz) — relaxed focus, calm awareness
+// Amplitude-modulated tone pulsing at 10Hz. Works WITHOUT headphones.
+function createAlphaIsochronic(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.15;
+    master.connect(ctx.destination);
+
+    const reverb = createReverb(ctx, 3, 2);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.3;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+
+    const oscs = [];
+
+    // Carrier tone
+    const carrier = ctx.createOscillator();
+    carrier.type = 'sine';
+    carrier.frequency.value = 200;
+
+    // Isochronic pulse: amplitude modulation at 10 Hz
+    const carrierGain = ctx.createGain();
+    carrierGain.gain.value = 0.5; // center point
+
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine'; // smooth pulse (square = harsher)
+    lfo.frequency.value = 10; // 10 Hz alpha
+
+    const lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = 0.5; // modulates gain between 0 and 1
+
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(carrierGain.gain);
+
+    carrier.connect(carrierGain);
+    carrierGain.connect(master);
+    carrierGain.connect(reverb);
+
+    carrier.start();
+    lfo.start();
+    oscs.push(carrier, lfo);
+
+    // Gentle background wash — soft filtered noise
+    const bufferSize = 2 * ctx.sampleRate;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    let lastOut = 0;
+    for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        data[i] = (lastOut + 0.02 * white) / 1.02;
+        lastOut = data[i];
+        data[i] *= 3.5;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = 300;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.08;
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(master);
+    noise.start();
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        try { noise.stop(); } catch(e) {}
+        master.disconnect();
+    };
+}
+
+// 528 Hz Solfeggio — "Miracle tone" / healing frequency
+// The solfeggio frequency with the most evidence for relaxation response.
+function createSolfeggio528(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.15;
+    master.connect(ctx.destination);
+
+    const reverb = createReverb(ctx, 5, 1.5);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.5;
     reverb.connect(reverbGain);
     reverbGain.connect(master);
 
     const dry = ctx.createGain();
-    dry.gain.value = 0.6;
+    dry.gain.value = 0.4;
     dry.connect(master);
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1000;
-
-    filter.connect(reverb);
-    filter.connect(dry);
 
     const oscs = [];
 
-    // Fundamental C3 (sine) + fifth G3 (triangle) + octave C4 (triangle)
-    [[130.81, 'sine', 0.35, 0], [196.00, 'triangle', 0.18, 2], [261.63, 'triangle', 0.10, -2]].forEach(([freq, type, vol, detune]) => {
-        const osc = ctx.createOscillator();
-        osc.type = type;
-        osc.frequency.value = freq;
-        osc.detune.value = detune;
-        const g = ctx.createGain();
-        g.gain.value = vol;
-        osc.connect(g);
-        g.connect(filter);
-        osc.start();
-        oscs.push(osc);
-    });
+    // Primary 528 Hz
+    const primary = ctx.createOscillator();
+    primary.type = 'sine';
+    primary.frequency.value = 528;
+    const primaryGain = ctx.createGain();
+    primaryGain.gain.value = 0.25;
+    primary.connect(primaryGain);
+    primaryGain.connect(reverb);
+    primaryGain.connect(dry);
+    primary.start();
+    oscs.push(primary);
 
-    // Sub bass sine C2
+    // Octave below: 264 Hz (subtle)
     const sub = ctx.createOscillator();
     sub.type = 'sine';
-    sub.frequency.value = 65.41;
+    sub.frequency.value = 264;
     const subGain = ctx.createGain();
-    subGain.gain.value = 0.15;
+    subGain.gain.value = 0.12;
     sub.connect(subGain);
     subGain.connect(dry);
     sub.start();
     oscs.push(sub);
 
-    // Slow amplitude LFO for breathing feel
+    // Octave above: 1056 Hz (very subtle shimmer)
+    const upper = ctx.createOscillator();
+    upper.type = 'sine';
+    upper.frequency.value = 1056;
+    const upperGain = ctx.createGain();
+    upperGain.gain.value = 0.04;
+    upper.connect(upperGain);
+    upperGain.connect(reverb);
+    upper.start();
+    oscs.push(upper);
+
+    // Slow breathing LFO
     const lfo = ctx.createOscillator();
     lfo.type = 'sine';
-    lfo.frequency.value = 0.08;
+    lfo.frequency.value = 0.06;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.04;
+    lfo.connect(lfoGain);
+    lfoGain.connect(master.gain);
+    lfo.start();
+    oscs.push(lfo);
+
+    return () => {
+        oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+        master.disconnect();
+    };
+}
+
+// Om 136.1 Hz — Earth year frequency
+// Based on the orbital period of Earth. Used in Tibetan singing bowls
+// and Indian classical music (Sa = 136.1 Hz in some tuning systems).
+function createOm136(ctx) {
+    const master = ctx.createGain();
+    master.gain.value = 0.15;
+    master.connect(ctx.destination);
+
+    const reverb = createReverb(ctx, 4, 1.8);
+    const reverbGain = ctx.createGain();
+    reverbGain.gain.value = 0.4;
+    reverb.connect(reverbGain);
+    reverbGain.connect(master);
+
+    const dry = ctx.createGain();
+    dry.gain.value = 0.5;
+    dry.connect(master);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 800;
+    filter.connect(reverb);
+    filter.connect(dry);
+
+    const oscs = [];
+
+    // Fundamental: 136.1 Hz (sine — pure Om)
+    const fundamental = ctx.createOscillator();
+    fundamental.type = 'sine';
+    fundamental.frequency.value = 136.1;
+    const fundGain = ctx.createGain();
+    fundGain.gain.value = 0.3;
+    fundamental.connect(fundGain);
+    fundGain.connect(filter);
+    fundamental.start();
+    oscs.push(fundamental);
+
+    // Natural overtones (triangle — soft odd harmonics)
+    const fifth = ctx.createOscillator();
+    fifth.type = 'triangle';
+    fifth.frequency.value = 272.2; // octave
+    fifth.detune.value = 2;
+    const fifthGain = ctx.createGain();
+    fifthGain.gain.value = 0.12;
+    fifth.connect(fifthGain);
+    fifthGain.connect(filter);
+    fifth.start();
+    oscs.push(fifth);
+
+    const third = ctx.createOscillator();
+    third.type = 'triangle';
+    third.frequency.value = 408.3; // 3rd harmonic
+    third.detune.value = -2;
+    const thirdGain = ctx.createGain();
+    thirdGain.gain.value = 0.06;
+    third.connect(thirdGain);
+    thirdGain.connect(filter);
+    third.start();
+    oscs.push(third);
+
+    // Sub octave
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.value = 68.05; // octave below
+    const subGain = ctx.createGain();
+    subGain.gain.value = 0.1;
+    sub.connect(subGain);
+    subGain.connect(dry);
+    sub.start();
+    oscs.push(sub);
+
+    // Slow breathing LFO
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.07; // ~one breath cycle per 14s
     const lfoGain = ctx.createGain();
     lfoGain.gain.value = 0.03;
     lfo.connect(lfoGain);
@@ -695,526 +993,12 @@ function createOmDrone(ctx) {
     };
 }
 
-// Crystal Bowls: spacious solfeggio frequencies with long reverb
-function createCrystalBowls(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 6, 1.5);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.6;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    const dry = ctx.createGain();
-    dry.gain.value = 0.3;
-    dry.connect(master);
-
-    const frequencies = [396, 528, 639]; // 3 solfeggio (dropped shrill 741)
-    const allOscs = [];
-    const timeouts = [];
-
-    frequencies.forEach((freq, i) => {
-        // Fundamental + one octave only (2 overtones per bowl)
-        [1, 2.0].forEach((harmonic, h) => {
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.value = freq * harmonic;
-            const g = ctx.createGain();
-            g.gain.value = 0;
-            osc.connect(g);
-            g.connect(reverb);
-            g.connect(dry);
-            osc.start();
-            allOscs.push(osc);
-
-            function swell() {
-                const now = ctx.currentTime;
-                const fadeIn = 4 + Math.random() * 2;
-                const sustain = 3 + Math.random() * 2;
-                const fadeOut = 5 + Math.random() * 2;
-                const vol = h === 0 ? 0.25 : 0.08;
-
-                g.gain.cancelScheduledValues(now);
-                g.gain.setValueAtTime(0, now);
-                g.gain.linearRampToValueAtTime(vol, now + fadeIn);
-                g.gain.setValueAtTime(vol, now + fadeIn + sustain);
-                g.gain.linearRampToValueAtTime(0, now + fadeIn + sustain + fadeOut);
-
-                const next = (fadeIn + sustain + fadeOut + 5 + Math.random() * 3) * 1000;
-                timeouts.push(setTimeout(swell, next));
-            }
-
-            // Stagger: each bowl + overtone starts at different times
-            timeouts.push(setTimeout(swell, i * 4000 + h * 2000 + Math.random() * 5000));
-        });
-    });
-
-    return () => {
-        allOscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        timeouts.forEach(id => clearTimeout(id));
-        master.disconnect();
-    };
-}
-
-// Synthwave: rhythmic step sequencer with drums, bass, arp, and pad
-function createSynthwave(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 3.5, 2);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.4;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    // Chord progression: Am → F → C → G (2 bars each)
-    const chords = [
-        { root: 110.00, notes: [220.00, 261.63, 329.63] },  // Am
-        { root: 87.31,  notes: [174.61, 220.00, 261.63] },  // F
-        { root: 130.81, notes: [261.63, 329.63, 392.00] },  // C
-        { root: 98.00,  notes: [196.00, 246.94, 293.66] },  // G
-    ];
-
-    const bpm = 108;
-    const stepTime = 60 / bpm / 4; // 16th note duration
-
-    // Drum patterns (16 steps)
-    const kickPattern =  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,1];
-    const snarePattern = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
-    const hatPattern =   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1];
-    // Bass pattern: R=root, 8=octave up
-    const bassPattern =  [1,0,0,0, 0,0,2,0, 0,0,0,0, 1,0,0,0]; // 1=root, 2=octave
-    // Arp pattern: scale degrees 1,3,5,8
-    const arpDegrees =   [0,1,2,3, 2,1,0,1, 2,3,2,1, 0,2,3,2];
-
-    const drumGain = ctx.createGain();
-    drumGain.gain.value = 0.08;
-    drumGain.connect(master);
-
-    const bassFilter = ctx.createBiquadFilter();
-    bassFilter.type = 'lowpass';
-    bassFilter.frequency.value = 600;
-    const bassGain = ctx.createGain();
-    bassGain.gain.value = 0.10;
-    bassFilter.connect(bassGain);
-    bassGain.connect(master);
-
-    const arpFilter = ctx.createBiquadFilter();
-    arpFilter.type = 'lowpass';
-    arpFilter.frequency.value = 3000;
-    const arpGain = ctx.createGain();
-    arpGain.gain.value = 0.06;
-    arpFilter.connect(arpGain);
-    arpGain.connect(reverb);
-    arpGain.connect(master);
-
-    // Pad layer — continuous sine oscillators per chord
-    const padOscs = [];
-    const padGains = [];
-    for (let i = 0; i < 3; i++) {
-        const osc1 = ctx.createOscillator();
-        osc1.type = 'sine';
-        osc1.frequency.value = chords[0].notes[i];
-        osc1.detune.value = 3;
-        const osc2 = ctx.createOscillator();
-        osc2.type = 'sine';
-        osc2.frequency.value = chords[0].notes[i];
-        osc2.detune.value = -3;
-        const g = ctx.createGain();
-        g.gain.value = 0.03;
-        osc1.connect(g);
-        osc2.connect(g);
-        g.connect(reverb);
-        osc1.start();
-        osc2.start();
-        padOscs.push(osc1, osc2);
-        padGains.push({ gain: g, idx: i });
-    }
-
-    let step = 0;
-    let currentBar = 0;
-    let nextStepTime = ctx.currentTime + 0.1;
-
-    function getChord() {
-        return chords[Math.floor(currentBar / 2) % chords.length];
-    }
-
-    function scheduleKick(time) {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, time);
-        osc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(1, time);
-        g.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
-        osc.connect(g);
-        g.connect(drumGain);
-        osc.start(time);
-        osc.stop(time + 0.5);
-    }
-
-    function scheduleSnare(time) {
-        // Noise burst
-        const bufLen = ctx.sampleRate * 0.15;
-        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
-        const noise = ctx.createBufferSource();
-        noise.buffer = buf;
-        const bp = ctx.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.value = 1500;
-        const ng = ctx.createGain();
-        ng.gain.setValueAtTime(0.8, time);
-        ng.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-        noise.connect(bp);
-        bp.connect(ng);
-        ng.connect(drumGain);
-        noise.start(time);
-        noise.stop(time + 0.15);
-        // Body tone
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = 200;
-        const sg = ctx.createGain();
-        sg.gain.setValueAtTime(0.6, time);
-        sg.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-        osc.connect(sg);
-        sg.connect(drumGain);
-        osc.start(time);
-        osc.stop(time + 0.1);
-    }
-
-    function scheduleHat(time, s) {
-        const isOpen = s % 2 === 1;
-        const dur = isOpen ? 0.15 : 0.05;
-        const bufLen = ctx.sampleRate * dur;
-        const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
-        const noise = ctx.createBufferSource();
-        noise.buffer = buf;
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass';
-        hp.frequency.value = 8000;
-        const hg = ctx.createGain();
-        hg.gain.setValueAtTime(0.5, time);
-        hg.gain.exponentialRampToValueAtTime(0.001, time + dur);
-        noise.connect(hp);
-        hp.connect(hg);
-        hg.connect(drumGain);
-        noise.start(time);
-        noise.stop(time + dur);
-    }
-
-    function scheduleBass(time, s) {
-        const chord = getChord();
-        const note = bassPattern[s];
-        if (!note) return;
-        const freq = note === 2 ? chord.root * 2 : chord.root;
-        const osc = ctx.createOscillator();
-        osc.type = 'square';
-        osc.frequency.value = freq;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.5, time);
-        g.gain.exponentialRampToValueAtTime(0.001, time + stepTime * 3);
-        osc.connect(g);
-        g.connect(bassFilter);
-        osc.start(time);
-        osc.stop(time + stepTime * 3);
-    }
-
-    function scheduleArp(time, s) {
-        const chord = getChord();
-        const arpNotes = [chord.root * 2, chord.notes[0], chord.notes[1], chord.notes[2]];
-        const degree = arpDegrees[s];
-        const freq = arpNotes[degree];
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = freq;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.5, time);
-        g.gain.exponentialRampToValueAtTime(0.001, time + stepTime * 1.5);
-        osc.connect(g);
-        g.connect(arpFilter);
-        osc.start(time);
-        osc.stop(time + stepTime * 1.5);
-    }
-
-    function scheduleStep(time, s) {
-        if (kickPattern[s]) scheduleKick(time);
-        if (snarePattern[s]) scheduleSnare(time);
-        if (hatPattern[s]) scheduleHat(time, s);
-        scheduleBass(time, s);
-        scheduleArp(time, s);
-    }
-
-    // Update pad chord on bar change
-    let lastChordIdx = -1;
-    function updatePad() {
-        const ci = Math.floor(currentBar / 2) % chords.length;
-        if (ci === lastChordIdx) return;
-        lastChordIdx = ci;
-        const chord = chords[ci];
-        const now = ctx.currentTime;
-        padGains.forEach(({ gain, idx }) => {
-            // Ramp existing oscillators to new chord notes
-        });
-        padOscs.forEach((osc, i) => {
-            const noteIdx = Math.floor(i / 2);
-            osc.frequency.exponentialRampToValueAtTime(chord.notes[noteIdx], now + 1);
-        });
-    }
-
-    const schedulerId = setInterval(() => {
-        while (nextStepTime < ctx.currentTime + 0.5) {
-            const s = step % 16;
-            if (s === 0) {
-                currentBar++;
-                updatePad();
-            }
-            scheduleStep(nextStepTime, s);
-            step++;
-            nextStepTime += stepTime;
-        }
-    }, 200);
-
-    return () => {
-        clearInterval(schedulerId);
-        padOscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        master.disconnect();
-    };
-}
-
-// Thunderstorm: rain + distant thunder with reverb
-function createThunderstorm(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const thunderReverb = createReverb(ctx, 4, 1.5);
-    const thunderReverbGain = ctx.createGain();
-    thunderReverbGain.gain.value = 0.5;
-    thunderReverb.connect(thunderReverbGain);
-    thunderReverbGain.connect(master);
-
-    const bufferSize = 2 * ctx.sampleRate;
-
-    // Brown noise for rain
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        data[i] = (lastOut + 0.02 * white) / 1.02;
-        lastOut = data[i];
-        data[i] *= 3.5;
-    }
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 400;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.45;
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(master);
-    noise.start();
-
-    // High-frequency rain patter
-    const rainBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const rainData = rainBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) rainData[i] = Math.random() * 2 - 1;
-
-    const rain = ctx.createBufferSource();
-    rain.buffer = rainBuffer;
-    rain.loop = true;
-    const rainFilter = ctx.createBiquadFilter();
-    rainFilter.type = 'highpass';
-    rainFilter.frequency.value = 4000;
-    const rainGain = ctx.createGain();
-    rainGain.gain.value = 0.05;
-    rain.connect(rainFilter);
-    rainFilter.connect(rainGain);
-    rainGain.connect(master);
-    rain.start();
-
-    // Slow rain intensity variation
-    const rainLfo = ctx.createOscillator();
-    rainLfo.type = 'sine';
-    rainLfo.frequency.value = 0.02;
-    const rainLfoGain = ctx.createGain();
-    rainLfoGain.gain.value = 0.15;
-    rainLfo.connect(rainLfoGain);
-    rainLfoGain.connect(noiseGain.gain);
-    rainLfo.start();
-
-    // Occasional thunder with reverb
-    const timeouts = [];
-    function thunder() {
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = 40 + Math.random() * 50;
-        const tf = ctx.createBiquadFilter();
-        tf.type = 'lowpass';
-        tf.frequency.value = 120;
-        const tg = ctx.createGain();
-        const dur = 3 + Math.random() * 5;
-        tg.gain.setValueAtTime(0, now);
-        tg.gain.linearRampToValueAtTime(0.25, now + 0.05);
-        tg.gain.exponentialRampToValueAtTime(0.001, now + dur);
-        osc.connect(tf);
-        tf.connect(tg);
-        tg.connect(thunderReverb); // through reverb for distance
-        tg.connect(master);
-        osc.start(now);
-        osc.stop(now + dur);
-
-        timeouts.push(setTimeout(thunder, (10 + Math.random() * 15) * 1000));
-    }
-    timeouts.push(setTimeout(thunder, 4000 + Math.random() * 6000));
-
-    return () => {
-        try { noise.stop(); } catch(e) {}
-        try { rain.stop(); } catch(e) {}
-        try { rainLfo.stop(); } catch(e) {}
-        timeouts.forEach(id => clearTimeout(id));
-        master.disconnect();
-    };
-}
-
-// Space Ambient: low pad + arpeggiated pentatonic bells + heavy reverb
-function createSpaceAmbient(ctx) {
-    const master = ctx.createGain();
-    master.gain.value = 0.15;
-    master.connect(ctx.destination);
-
-    const reverb = createReverb(ctx, 6, 1.2);
-    const reverbGain = ctx.createGain();
-    reverbGain.gain.value = 0.7;
-    reverb.connect(reverbGain);
-    reverbGain.connect(master);
-
-    const dry = ctx.createGain();
-    dry.gain.value = 0.2;
-    dry.connect(master);
-
-    const allOscs = [];
-
-    // Low evolving pad — triangle waves with slow filter
-    const padFilter = ctx.createBiquadFilter();
-    padFilter.type = 'lowpass';
-    padFilter.frequency.value = 250;
-    padFilter.connect(reverb);
-    padFilter.connect(dry);
-
-    const padLfo = ctx.createOscillator();
-    padLfo.type = 'sine';
-    padLfo.frequency.value = 0.02;
-    const padLfoGain = ctx.createGain();
-    padLfoGain.gain.value = 80;
-    padLfo.connect(padLfoGain);
-    padLfoGain.connect(padFilter.frequency);
-    padLfo.start();
-    allOscs.push(padLfo);
-
-    [[70, 0.2], [105, 0.12], [140, 0.06]].forEach(([freq, vol]) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = freq;
-        const g = ctx.createGain();
-        g.gain.value = vol;
-        osc.connect(g);
-        g.connect(padFilter);
-        osc.start();
-        allOscs.push(osc);
-    });
-
-    // Arpeggiated bell tones — A minor pentatonic across 2 octaves
-    const arpNotes = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99];
-    const timeouts = [];
-    let arpIndex = 0;
-
-    function arpBell() {
-        const now = ctx.currentTime;
-        // Pick next note (mostly ascending, occasional skip)
-        arpIndex = (arpIndex + 1 + Math.floor(Math.random() * 2)) % arpNotes.length;
-        const freq = arpNotes[arpIndex];
-
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-
-        // Slight vibrato
-        const vib = ctx.createOscillator();
-        vib.type = 'sine';
-        vib.frequency.value = 4 + Math.random() * 2;
-        const vibGain = ctx.createGain();
-        vibGain.gain.value = 2;
-        vib.connect(vibGain);
-        vibGain.connect(osc.frequency);
-        vib.start(now);
-
-        const bellGain = ctx.createGain();
-        const dur = 3 + Math.random() * 2;
-        bellGain.gain.setValueAtTime(0, now);
-        bellGain.gain.linearRampToValueAtTime(0.08, now + 0.08);
-        bellGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
-        osc.connect(bellGain);
-        bellGain.connect(reverb); // heavy reverb makes it shimmer
-
-        osc.start(now);
-        osc.stop(now + dur + 0.1);
-        vib.stop(now + dur + 0.1);
-
-        // Random spacing: sometimes quick runs, sometimes long pauses
-        const pause = Math.random() < 0.3 ? 1 + Math.random() * 1 : 3 + Math.random() * 5;
-        timeouts.push(setTimeout(arpBell, pause * 1000));
-    }
-
-    // Occasional deep sub-bass swell
-    function subSwell() {
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = 40 + Math.random() * 30;
-        const g = ctx.createGain();
-        const dur = 6 + Math.random() * 4;
-        g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(0.06, now + dur * 0.3);
-        g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-        osc.connect(g);
-        g.connect(dry);
-        osc.start(now);
-        osc.stop(now + dur + 0.1);
-
-        timeouts.push(setTimeout(subSwell, (12 + Math.random() * 10) * 1000));
-    }
-
-    timeouts.push(setTimeout(arpBell, 1500 + Math.random() * 2000));
-    timeouts.push(setTimeout(subSwell, 5000 + Math.random() * 5000));
-
-    return () => {
-        allOscs.forEach(o => { try { o.stop(); } catch(e) {} });
-        timeouts.forEach(id => clearTimeout(id));
-        master.disconnect();
-    };
-}
-
 const MUSIC_GENERATORS = {
-    om: createOmDrone,
-    bowls: createCrystalBowls,
-    pad: createSynthwave,
-    thunder: createThunderstorm,
-    space: createSpaceAmbient,
+    theta: createThetaBinaural,
+    gamma: createGammaBinaural,
+    alpha: createAlphaIsochronic,
+    solfeggio: createSolfeggio528,
+    om136: createOm136,
 };
 
 function startMusic() {
@@ -1894,8 +1678,12 @@ function init() {
 
     const savedBgMusic = localStorage.getItem('thirdeye-bgMusic');
     if (savedBgMusic) {
-        bgMusicType = savedBgMusic;
-        bgMusicSelect.value = savedBgMusic;
+        // Migrate old music keys to new evidence-based ones
+        const musicMigration = { om: 'om136', bowls: 'solfeggio', pad: 'alpha', thunder: 'theta', space: 'gamma' };
+        const migrated = musicMigration[savedBgMusic] || savedBgMusic;
+        if (migrated !== savedBgMusic) localStorage.setItem('thirdeye-bgMusic', migrated);
+        bgMusicType = migrated;
+        bgMusicSelect.value = migrated;
     }
 
     const savedTrack = localStorage.getItem('thirdeye-trackDefault');
