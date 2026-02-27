@@ -1689,6 +1689,15 @@ function processGuess(transcript) {
         .replace(/^(a |an |the )/i, '')
         .trim();
 
+    // Voice commands — eyes are closed, so voice is the only way to signal "I'm done"
+    const lowerRaw = raw.toLowerCase();
+    if (/\b(open|done|give up|i'?m ready|show me|ready|reveal|finished)\b/.test(lowerRaw)) {
+        playReadyTone();
+        speak('Open your eyes and mark it.');
+        lastHeard.textContent = 'Open your eyes and tap Exact or Close.';
+        return;
+    }
+
     const dist = getSemanticDistance(guess, currentAnswer[0]);
 
     // Perception layer — universal across all feedback modes
@@ -1697,7 +1706,8 @@ function processGuess(transcript) {
         perception = "You got it! Open your eyes and mark it.";
         playCorrectSound();
     } else if (dist <= 3) {
-        perception = "You're sensing it!";
+        perception = "You're sensing it! Open your eyes and mark it.";
+        playCorrectSound();
     }
 
     // Feedback mode layer (for non-perception guesses)
