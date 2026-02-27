@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Third Eye</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <h1 class="title">Third Eye</h1>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel">
+            <div class="toggle-group">
+                <button id="btn-words" class="toggle-btn active">Words</button>
+                <button id="btn-images" class="toggle-btn">Images</button>
+            </div>
+
+            <div class="timer-section">
+                <h3>Practice Settings</h3>
+                <div class="setting-row">
+                    <label for="display-mode">Display Mode</label>
+                    <select id="display-mode">
+                        <option value="standard">Standard</option>
+                        <option value="focus">Focus</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label for="feedback-mode">Feedback Mode</label>
+                    <select id="feedback-mode">
+                        <option value="simple">Simple</option>
+                        <option value="hints">Progressive Hints</option>
+                        <option value="hotcold">Hot / Cold</option>
+                        <option value="spiritual">Spiritual</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div id="custom-hints-row" class="setting-row custom-hints-row hidden">
+                    <label for="custom-hints">Custom Hints (one per line)</label>
+                    <textarea id="custom-hints" rows="4" placeholder="Trust your inner vision...&#10;The answer is coming to you...&#10;Breathe and let it appear..."></textarea>
+                </div>
+                <div class="setting-row">
+                    <label for="bg-music">Background Music</label>
+                    <select id="bg-music">
+                        <option value="none">None</option>
+                        <option value="om">Om Drone</option>
+                        <option value="bowls">Crystal Bowls</option>
+                        <option value="pad">Synthwave</option>
+                        <option value="thunder">Thunderstorm</option>
+                        <option value="space">Space Ambient</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label for="theme-select">Theme</label>
+                    <select id="theme-select">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                        <option value="blackout">Blackout</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="timer-section">
+                <h3>Reminder Timer</h3>
+                <div class="timer-inputs">
+                    <div class="input-group">
+                        <input type="number" id="timer-hours" min="0" max="23" value="0">
+                        <span>hours</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="timer-minutes" min="0" max="59" value="30">
+                        <span>min</span>
+                    </div>
+                </div>
+                <button id="btn-start-timer" class="btn-secondary">Start Timer</button>
+                <button id="btn-stop-timer" class="btn-secondary hidden">Stop Timer</button>
+                <p id="timer-display" class="timer-display hidden">
+                    Next in: <span id="timer-countdown">--:--:--</span>
+                </p>
+            </div>
+
+            <div class="timer-section">
+                <h3>Voice</h3>
+                <select id="voice-select"></select>
+                <button id="btn-voice-test" class="btn-voice-test">Test</button>
+            </div>
+
+            <div class="timer-section">
+                <h3>Audio Devices</h3>
+                <div class="setting-row">
+                    <label for="audio-input">Microphone</label>
+                    <select id="audio-input">
+                        <option value="default">Default</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label for="audio-output">Speaker</label>
+                    <select id="audio-output">
+                        <option value="default">Default</option>
+                    </select>
+                </div>
+                <p class="device-hint">If mic isn't working, also check your browser's site permissions (lock icon in address bar).</p>
+            </div>
+
+            <div class="timer-section">
+                <h3>Session Duration</h3>
+                <div class="timer-inputs">
+                    <div class="input-group">
+                        <input type="number" id="session-minutes" min="1" max="120" value="5">
+                        <span>min</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row track-row">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="track-session" checked>
+                    Track this session
+                </label>
+            </div>
+
+            <div class="settings-actions">
+                <button id="btn-start-exercise" class="btn-primary">Start Exercise</button>
+                <button id="btn-dashboard" class="btn-secondary">Dashboard</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Panel -->
+        <div id="dashboard-panel" class="hidden">
+            <div id="dashboard-today"></div>
+            <div id="dashboard-table-container"></div>
+            <button id="btn-dashboard-back" class="btn-secondary">Back</button>
+        </div>
+
+        <!-- Session timer bar -->
+        <div id="session-bar" class="session-bar hidden">
+            <span id="session-time-left">05:00</span>
+        </div>
+
+        <!-- Countdown -->
+        <div id="countdown-area" class="hidden">
+            <p class="countdown-label">Close your eyes...</p>
+            <p id="countdown-number" class="countdown-number">5</p>
+        </div>
+
+        <!-- Active Exercise -->
+        <div id="exercise-area" class="hidden">
+            <div id="display-content" class="word-display"></div>
+
+            <div class="listening-section">
+                <div id="mic-icon" class="mic-icon">&#x1F3A4;</div>
+                <p id="listening-status" class="listening-status">Listening...</p>
+                <p id="last-heard" class="last-heard"></p>
+            </div>
+
+            <div id="mid-session-controls">
+                <button id="btn-skip" class="btn-secondary btn-small">Skip</button>
+                <button id="btn-toggle-mode" class="btn-secondary btn-small">Switch to Images</button>
+            </div>
+
+            <button id="btn-stop" class="btn-danger">Stop</button>
+        </div>
+
+        <!-- Result -->
+        <div id="result-area" class="hidden">
+            <p class="result-badge">&#x2713; Correct!</p>
+            <div id="result-content"></div>
+            <div class="result-actions">
+                <button id="btn-new-exercise" class="btn-primary">Start New Exercise</button>
+                <button id="btn-back-menu" class="btn-secondary">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Complete Overlay -->
+    <div id="session-overlay" class="session-overlay hidden">
+        <div class="overlay-content">
+            <h2>Session Complete</h2>
+            <p>Well done!</p>
+            <button id="btn-overlay-menu" class="btn-primary">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Focus mode exit hotspot -->
+    <button id="focus-exit" class="focus-exit hidden" aria-label="Exit focus mode">&times;</button>
+
+    <script src="app.js"></script>
+</body>
+</html>
