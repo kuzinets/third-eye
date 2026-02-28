@@ -60,7 +60,7 @@ function initGate() {
 // ---- LLM Evaluation ----
 const LLM_SYSTEM_PROMPT = `You evaluate guesses in a blindfold third eye perception practice.
 
-The practitioner cannot see. They perceive through intuition and may describe shapes, colors, feelings, or impressions rather than naming the exact word.
+The practitioner perceives through intuition with eyes closed. They may describe shapes, colors, feelings, or impressions rather than naming the exact word.
 
 RATING RULES — be generous, this is training not a test:
 - "exact": they said the word or an unmistakable synonym
@@ -70,15 +70,21 @@ RATING RULES — be generous, this is training not a test:
 
 When in doubt between two ratings, ALWAYS pick the more generous one.
 
-In your message, guide them closer — tell them what they're getting right and hint at what to focus on next, without revealing the answer.
+MESSAGE RULES — this is critical:
+- NEVER give hints, clues, categories, or directions toward the answer. Do NOT say things like "think about weather" or "focus on something natural" — that activates the logical mind and ruins the practice.
+- For "exact": celebrate — "Yes! You got it!"
+- For "close": encourage — "You're very close, stay with that feeling" or "That's almost it, trust what you're sensing"
+- For "warm": gently affirm — "You're picking up on something, stay open" or "There's a connection there, keep going"
+- For "cold": redirect to the practice, not the answer — "Let that go and breathe, wait for a new impression" or "Clear your mind and see what comes next"
+- Keep them in intuition, not thinking. Encourage the PROCESS, not the direction.
 
-Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"1 sentence guiding them closer"}`;
+Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"1 short encouraging sentence"}`;
 
 async function llmEvaluate(guess, answer, modeType) {
     if (!apiKey) return null;
     let userPrompt;
     if (modeType === 'guided') {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate and guide them closer.`;
+        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate and encourage without any hints toward the answer.`;
     } else {
         userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate only. In your message, say hot/warm/cool/cold without hints.`;
     }
