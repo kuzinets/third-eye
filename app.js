@@ -58,35 +58,41 @@ function initGate() {
 }
 
 // ---- LLM Evaluation ----
-const LLM_SYSTEM_PROMPT = `You evaluate guesses in a blindfold third eye perception practice.
+const LLM_SYSTEM_PROMPT = `You are a third eye perception practice coach in the tradition of Paramashiva and Swamiji (Nithyananda). A practitioner has their eyes closed and is perceiving through their ajna chakra — the seat of Will and intuition.
 
-The practitioner perceives through intuition with eyes closed. They may describe shapes, colors, feelings, or impressions rather than naming the exact word.
-
-RATING RULES — be generous, this is training not a test:
+RATING RULES — be generous, this is sacred training not a test:
 - "exact": they said the word or an unmistakable synonym
-- "close": they described something clearly related — same category, similar shape, related concept, or a visual property that matches. Examples: "circular shape" for "heart" = close. "air" for "breeze" = close. "spiky" for "thunder" = close.
+- "close": clearly related — same category, similar shape, related concept, or a visual property that matches. Examples: "circular shape" for "heart" = close. "air" for "breeze" = close. "spiky" for "thunder" = close.
 - "warm": any single element connects — a shared color, vague shape similarity, same general domain
 - "cold": ONLY when there is genuinely zero connection. This should be RARE.
+When in doubt, ALWAYS pick the more generous rating.
 
-When in doubt between two ratings, ALWAYS pick the more generous one.
+HOW TO RESPOND — this is critical:
+- NEVER give hints, clues, categories, or any direction toward the answer. Saying "think about weather" or "focus on something natural" activates the logical mind and destroys the practice. You must NEVER steer them.
+- Be a warm, engaged coach — not a robot repeating the same phrase. Each response should feel fresh and personal to what they just said.
+- Acknowledge what they shared specifically ("A box... now a column...") before encouraging.
+- Reference their journey in this session — if they've been trying different things, notice that.
+- Draw from these coaching principles: Will persistence (keep your Will alive), completion (release doubt patterns), trust the ajna (your third eye already knows), it's a natural power not effort, let impressions come don't chase them.
+- Vary your language! Never repeat the same encouragement twice. Be creative, natural, conversational.
 
-MESSAGE RULES — this is critical:
-- NEVER give hints, clues, categories, or directions toward the answer. Do NOT say things like "think about weather" or "focus on something natural" — that activates the logical mind and ruins the practice.
-- For "exact": celebrate — "Yes! You got it!"
-- For "close": encourage — "You're very close, stay with that feeling" or "That's almost it, trust what you're sensing"
-- For "warm": gently affirm — "You're picking up on something, stay open" or "There's a connection there, keep going"
-- For "cold": redirect to the practice, not the answer — "Let that go and breathe, wait for a new impression" or "Clear your mind and see what comes next"
-- Keep them in intuition, not thinking. Encourage the PROCESS, not the direction.
+Tone by rating:
+- "exact": Celebrate with genuine joy and energy
+- "close": Excited encouragement — they're right there, their ajna is active, stay with it
+- "warm": Affirm the connection they're making, encourage them to stay open and let more come
+- "cold": Gently redirect back to the practice — release that impression, breathe, let your ajna show you something new. No judgment.
 
-Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"1 short encouraging sentence"}`;
+Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"1-2 sentences, warm and personal"}`;
 
-async function llmEvaluate(guess, answer, modeType) {
+async function llmEvaluate(guess, answer, modeType, history) {
     if (!apiKey) return null;
+    const prevGuesses = (history && history.length > 1)
+        ? `\nPrevious guesses this round: ${history.slice(0, -1).map(g => `"${g}"`).join(', ')}`
+        : '';
     let userPrompt;
     if (modeType === 'guided') {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate and encourage without any hints toward the answer.`;
+        userPrompt = `Target: "${answer}"\nPractitioner just said: "${guess}"${prevGuesses}\n\nRate and encourage. No hints toward the answer.`;
     } else {
-        userPrompt = `Target: "${answer}"\nPractitioner said: "${guess}"\n\nRate only. In your message, say hot/warm/cool/cold without hints.`;
+        userPrompt = `Target: "${answer}"\nPractitioner just said: "${guess}"${prevGuesses}\n\nRate only. In your message, say hot/warm/cool/cold without hints.`;
     }
     try {
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -454,6 +460,7 @@ let lastGuessDistance = null;
 let itemEndTime = null;
 let itemTickId = null;
 let llmPending = false;
+let guessHistory = []; // previous guesses for current item, for LLM context
 
 // ---- DOM ----
 const settingsPanel = document.getElementById('settings-panel');
@@ -1522,6 +1529,7 @@ function showExercise() {
     itemActive = true;
     lastGuessDistance = null;
     llmPending = false;
+    guessHistory = [];
     updateToggleModeButton();
     startItemTimer();
     startListening();
@@ -1582,9 +1590,10 @@ function processGuess(transcript) {
 
     // LLM-powered modes
     if (feedbackMode === 'hotcold' || feedbackMode === 'guided') {
+        guessHistory.push(guess);
         llmPending = true;
         lastHeard.textContent = `"${raw}" — thinking...`;
-        llmEvaluate(guess, currentAnswer[0], feedbackMode).then(result => {
+        llmEvaluate(guess, currentAnswer[0], feedbackMode, guessHistory).then(result => {
             llmPending = false;
             if (!itemActive) return; // Exercise ended while waiting
 
