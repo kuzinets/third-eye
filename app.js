@@ -5,6 +5,16 @@
 // ---- Password Gate & API Key ----
 const ENCRYPTED_KEY = 'OApEHBMcC2YLJAQCARYJUlFeK0ZQBRZeGRsGBBENXyUnQiRmADA+VhoxOjA/OyckOx0pGDMnNCAdFAsNPikyZgoGK1EbCxQ3KiAIFRciBiIOLSdSCQ0LByc5Uw8jEwQLAiobLQxYMxowDCkkOCg4AwQLDjMKQwo7CxoDO0AwOxVdIxI5FwdMBzMqC1gGPgouVEEFAyQ8NFlLLQAZBDtSJDl6ICg=';
 let apiKey = null;
+let currentUser = null; // 'kailasa', 'xy', or 'guest'
+
+const ACCOUNTS = [
+    { password: 'Kailasa', user: 'kailasa', canTrack: true },
+    { password: 'kailasa', user: 'kailasa', canTrack: true },
+    { password: 'Xy',      user: 'xy',      canTrack: true },
+    { password: 'xy',      user: 'xy',      canTrack: true },
+    { password: 'guest',   user: 'guest',   canTrack: false },
+    { password: 'Guest',   user: 'guest',   canTrack: false },
+];
 
 function decryptKey(password) {
     try {
@@ -18,6 +28,17 @@ function decryptKey(password) {
     } catch (e) { return null; }
 }
 
+// localStorage key scoped per user
+function lsKey(name) {
+    return currentUser ? `thirdeye-${currentUser}-${name}` : `thirdeye-${name}`;
+}
+
+function loginUser(account) {
+    currentUser = account.user;
+    // Decrypt API key using the main password (always 'Kailasa')
+    apiKey = decryptKey('Kailasa');
+}
+
 function initGate() {
     const gate = document.getElementById('password-gate');
     const app = document.getElementById('app');
@@ -25,26 +46,25 @@ function initGate() {
     const btn = document.getElementById('gate-submit');
     const err = document.getElementById('gate-error');
 
+    function unlock(account) {
+        loginUser(account);
+        sessionStorage.setItem('thirdeye-auth', account.password);
+        gate.classList.add('hidden');
+        app.classList.remove('hidden');
+    }
+
     // Check session
     const saved = sessionStorage.getItem('thirdeye-auth');
     if (saved) {
-        const key = decryptKey(saved);
-        if (key) {
-            apiKey = key;
-            gate.classList.add('hidden');
-            app.classList.remove('hidden');
-            return;
-        }
+        const account = ACCOUNTS.find(a => a.password === saved);
+        if (account) { unlock(account); return; }
     }
 
     function tryPassword() {
         const pw = input.value;
-        const key = decryptKey(pw);
-        if (key) {
-            apiKey = key;
-            sessionStorage.setItem('thirdeye-auth', pw);
-            gate.classList.add('hidden');
-            app.classList.remove('hidden');
+        const account = ACCOUNTS.find(a => a.password === pw);
+        if (account) {
+            unlock(account);
         } else {
             err.classList.remove('hidden');
             input.value = '';
@@ -585,12 +605,12 @@ async function enumerateAudioDevices() {
         });
 
         // Restore saved selections
-        const savedInput = localStorage.getItem('thirdeye-audioInput');
+        const savedInput = localStorage.getItem(lsKey('audioInput'));
         if (savedInput) {
             audioInputSelect.value = savedInput;
             selectedAudioInputId = savedInput;
         }
-        const savedOutput = localStorage.getItem('thirdeye-audioOutput');
+        const savedOutput = localStorage.getItem(lsKey('audioOutput'));
         if (savedOutput) {
             audioOutputSelect.value = savedOutput;
             selectedAudioOutputId = savedOutput;
@@ -1086,7 +1106,7 @@ function populateVoices() {
     if (!voices.length) return;
 
     voiceSelect.innerHTML = '';
-    const savedVoice = localStorage.getItem('thirdeye-voice');
+    const savedVoice = localStorage.getItem(lsKey('voice'));
 
     voices.forEach((voice, i) => {
         const opt = document.createElement('option');
@@ -1111,7 +1131,7 @@ function onVoiceChange() {
     const idx = parseInt(voiceSelect.value);
     selectedVoice = voices[idx] || null;
     if (selectedVoice) {
-        localStorage.setItem('thirdeye-voice', selectedVoice.name);
+        localStorage.setItem(lsKey('voice'), selectedVoice.name);
     }
 }
 
@@ -1130,7 +1150,7 @@ function applyTheme(t) {
     document.body.classList.remove('theme-dark', 'theme-blackout');
     if (t === 'dark') document.body.classList.add('theme-dark');
     else if (t === 'blackout') document.body.classList.add('theme-blackout');
-    localStorage.setItem('thirdeye-theme', t);
+    localStorage.setItem(lsKey('theme'), t);
     themeSelect.value = t;
 }
 
@@ -1149,14 +1169,14 @@ function updateToggleModeButton() {
 // ---- Session Tracking ----
 function loadStats() {
     try {
-        return JSON.parse(localStorage.getItem('thirdeye-stats')) || {};
+        return JSON.parse(localStorage.getItem(lsKey('stats'))) || {};
     } catch (e) {
         return {};
     }
 }
 
 function saveStats(stats) {
-    localStorage.setItem('thirdeye-stats', JSON.stringify(stats));
+    localStorage.setItem(lsKey('stats'), JSON.stringify(stats));
 }
 
 function migrateDay(d) {
@@ -1774,14 +1794,33 @@ function init() {
         Notification.requestPermission();
     }
 
+    // Guest account: no tracking, hide tracker UI
+    const account = ACCOUNTS.find(a => a.user === currentUser);
+    if (account && !account.canTrack) {
+        trackingEnabled = false;
+        trackSessionCheckbox.checked = false;
+        document.querySelector('.track-row').classList.add('hidden');
+        btnDashboard.classList.add('hidden');
+    }
+
+    // Migrate old unscoped settings for 'kailasa' user (one-time)
+    if (currentUser === 'kailasa' && !localStorage.getItem(lsKey('stats'))) {
+        const migrate = ['stats', 'theme', 'feedbackMode', 'customHints', 'bgMusic',
+                         'trackDefault', 'voice', 'audioInput', 'audioOutput'];
+        for (const k of migrate) {
+            const old = localStorage.getItem(`thirdeye-${k}`);
+            if (old) localStorage.setItem(lsKey(k), old);
+        }
+    }
+
     // Load persisted settings
-    const savedTheme = localStorage.getItem('thirdeye-theme');
+    const savedTheme = localStorage.getItem(lsKey('theme'));
     if (savedTheme) applyTheme(savedTheme);
 
-    const savedFeedbackMode = localStorage.getItem('thirdeye-feedbackMode');
+    const savedFeedbackMode = localStorage.getItem(lsKey('feedbackMode'));
     if (savedFeedbackMode === 'hints') {
         // Migrate old 'hints' mode (removed) to 'simple'
-        localStorage.setItem('thirdeye-feedbackMode', 'simple');
+        localStorage.setItem(lsKey('feedbackMode'), 'simple');
     }
     if (savedFeedbackMode && savedFeedbackMode !== 'hints') {
         feedbackMode = savedFeedbackMode;
@@ -1790,24 +1829,24 @@ function init() {
     customHintsRow.classList.toggle('hidden', feedbackMode !== 'custom');
 
     try {
-        const savedCustomHints = localStorage.getItem('thirdeye-customHints');
+        const savedCustomHints = localStorage.getItem(lsKey('customHints'));
         if (savedCustomHints) {
             customHints = JSON.parse(savedCustomHints);
             customHintsTextarea.value = customHints.join('\n');
         }
     } catch (e) {}
 
-    const savedBgMusic = localStorage.getItem('thirdeye-bgMusic');
+    const savedBgMusic = localStorage.getItem(lsKey('bgMusic'));
     if (savedBgMusic) {
         // Migrate old music keys to new evidence-based ones
         const musicMigration = { om: 'om136', bowls: 'solfeggio', pad: 'alpha', thunder: 'theta', space: 'gamma' };
         const migrated = musicMigration[savedBgMusic] || savedBgMusic;
-        if (migrated !== savedBgMusic) localStorage.setItem('thirdeye-bgMusic', migrated);
+        if (migrated !== savedBgMusic) localStorage.setItem(lsKey('bgMusic'), migrated);
         bgMusicType = migrated;
         bgMusicSelect.value = migrated;
     }
 
-    const savedTrack = localStorage.getItem('thirdeye-trackDefault');
+    const savedTrack = localStorage.getItem(lsKey('trackDefault'));
     if (savedTrack !== null) {
         trackingEnabled = savedTrack === 'true';
         trackSessionCheckbox.checked = trackingEnabled;
@@ -1823,11 +1862,11 @@ function init() {
     enumerateAudioDevices();
     audioInputSelect.addEventListener('change', () => {
         selectedAudioInputId = audioInputSelect.value;
-        localStorage.setItem('thirdeye-audioInput', selectedAudioInputId);
+        localStorage.setItem(lsKey('audioInput'), selectedAudioInputId);
     });
     audioOutputSelect.addEventListener('change', async () => {
         selectedAudioOutputId = audioOutputSelect.value;
-        localStorage.setItem('thirdeye-audioOutput', selectedAudioOutputId);
+        localStorage.setItem(lsKey('audioOutput'), selectedAudioOutputId);
         await applyAudioOutput(selectedAudioOutputId);
     });
 
@@ -1838,18 +1877,18 @@ function init() {
     // Settings dropdowns
     feedbackModeSelect.addEventListener('change', () => {
         feedbackMode = feedbackModeSelect.value;
-        localStorage.setItem('thirdeye-feedbackMode', feedbackMode);
+        localStorage.setItem(lsKey('feedbackMode'), feedbackMode);
         customHintsRow.classList.toggle('hidden', feedbackMode !== 'custom');
     });
 
     customHintsTextarea.addEventListener('blur', () => {
         customHints = customHintsTextarea.value.split('\n').map(l => l.trim()).filter(Boolean);
-        localStorage.setItem('thirdeye-customHints', JSON.stringify(customHints));
+        localStorage.setItem(lsKey('customHints'), JSON.stringify(customHints));
     });
 
     bgMusicSelect.addEventListener('change', () => {
         bgMusicType = bgMusicSelect.value;
-        localStorage.setItem('thirdeye-bgMusic', bgMusicType);
+        localStorage.setItem(lsKey('bgMusic'), bgMusicType);
     });
 
     themeSelect.addEventListener('change', () => {
@@ -1858,7 +1897,7 @@ function init() {
 
     trackSessionCheckbox.addEventListener('change', () => {
         trackingEnabled = trackSessionCheckbox.checked;
-        localStorage.setItem('thirdeye-trackDefault', String(trackingEnabled));
+        localStorage.setItem(lsKey('trackDefault'), String(trackingEnabled));
     });
 
     // Timer
