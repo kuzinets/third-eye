@@ -1386,18 +1386,13 @@ function fireSessionAlarm() {
         clearInterval(countdownIntervalId);
         countdownIntervalId = null;
     }
-    if (recognition) {
-        recognition.abort();
-        recognition = null;
-    }
-
-    if (itemActive) {
-        trackEvent('timeout');
-        itemActive = false;
-    }
 
     stopItemTimer();
     stopMusic();
+
+    // Keep item active so user can still mark it — don't auto-advance
+    // Just show the banner and let them finish at their own pace
+    speak('Session complete. Take your time and mark it.');
 
     // Show session complete banner in the exercise area
     const existing = document.getElementById('session-complete-banner');
@@ -1437,11 +1432,13 @@ function startItemTimer() {
         const left = Math.max(0, Math.round((itemEndTime - Date.now()) / 1000));
         itemTimeLeft.textContent = formatTime(left);
         if (left <= 0) {
-            stopItemTimer();
+            clearInterval(itemTickId);
+            itemTickId = null;
+            itemEndTime = null;
+            itemTimeLeft.textContent = '00:00';
             if (itemActive) {
-                // Time's up for this item — auto-skip
-                speak('Time is up for this item.');
-                skipExercise();
+                speak('Time is up. Open your eyes and mark it.');
+                lastHeard.textContent = 'Time is up — tap Exact, Close, or No.';
             }
         }
     }, 500);
