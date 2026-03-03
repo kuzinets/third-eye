@@ -131,6 +131,27 @@
                 <button id="btn-start-exercise" class="btn-primary">Start Exercise</button>
                 <button id="btn-dashboard" class="btn-secondary">Dashboard</button>
             </div>
+            <!-- Activity Log -->
+            <div class="activity-log-area">
+                <button id="activity-log-toggle" class="btn-secondary">Activity Log</button>
+                <div id="activity-log-section" class="hidden">
+                    <div class="activity-log-table-wrap">
+                        <table class="activity-log-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Target</th>
+                                    <th>You Said</th>
+                                    <th>Response</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activity-log-body"></tbody>
+                        </table>
+                    </div>
+                    <p id="activity-log-empty" class="no-data hidden">No activity yet. Start practicing!</p>
+                </div>
+            </div>
         </div>
 
         <!-- Dashboard Panel -->

@@ -509,6 +509,27 @@ let itemTickId = null;
 let llmPending = false;
 let guessHistory = []; // previous guesses for current item, for LLM context
 
+// ---- Activity Log ----
+function loadActivityLog() {
+    try {
+        return JSON.parse(localStorage.getItem(lsKey('activitylog'))) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function appendLogEntry(type, target, userSaid, response) {
+    const log = loadActivityLog();
+    log.push({
+        date: new Date().toISOString(),
+        type,           // 'Word' or 'Image'
+        target,         // the actual word or emoji description
+        userSaid,       // raw speech transcript
+        response,       // app's feedback message
+    });
+    localStorage.setItem(lsKey('activitylog'), JSON.stringify(log));
+}
+
 // ---- DOM ----
 const settingsPanel = document.getElementById('settings-panel');
 const countdownArea = document.getElementById('countdown-area');
@@ -1291,6 +1312,38 @@ function renderDashboard() {
     dashboardTableContainer.innerHTML = html;
 }
 
+// ---- Activity Log Rendering ----
+function renderActivityLog() {
+    const log = loadActivityLog();
+    const logBody = document.getElementById('activity-log-body');
+    const logEmpty = document.getElementById('activity-log-empty');
+
+    if (log.length === 0) {
+        logBody.innerHTML = '';
+        logEmpty.classList.remove('hidden');
+        return;
+    }
+
+    logEmpty.classList.add('hidden');
+
+    // Show newest first
+    const reversed = [...log].reverse();
+    let html = '';
+    for (const entry of reversed) {
+        const d = new Date(entry.date);
+        const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const escaped = (s) => s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+        html += `<tr>
+            <td>${escaped(dateStr)}</td>
+            <td>${escaped(entry.type)}</td>
+            <td>${escaped(entry.target)}</td>
+            <td>${escaped(entry.userSaid)}</td>
+            <td>${escaped(entry.response)}</td>
+        </tr>`;
+    }
+    logBody.innerHTML = html;
+}
+
 // ---- Hint System ----
 function getCategoryOf(word) {
     for (const [cat, words] of Object.entries(IMAGE_CATEGORIES)) {
@@ -1656,6 +1709,7 @@ function processGuess(transcript) {
                     speak(msg);
                     lastHeard.textContent = `"${raw}" — ${msg}`;
                 }
+                appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, msg);
             } else {
                 // LLM failed, fall back to simple mode
                 const phrase = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
@@ -1663,6 +1717,7 @@ function processGuess(transcript) {
                 playTryAgainSound();
                 speak(phrase);
                 lastHeard.textContent = `"${raw}" — ${phrase}`;
+                appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, phrase);
             }
         });
         return;
@@ -1697,11 +1752,11 @@ function processGuess(transcript) {
 
     speak(message);
     lastHeard.textContent = `"${raw}" — ${message}`;
+    appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, message);
 }
 
 function finishItem(type) {
     trackEvent(type);
-    exerciseActive = false;
     itemActive = false;
     stopItemTimer();
     if (recognition) {
@@ -1715,30 +1770,20 @@ function finishItem(type) {
     if (type === 'exact') {
         playCorrectSound();
         speak(`It was ${answerText}. Well done.`);
-        resultBadge.textContent = '\u2713 Exact!';
-        resultBadge.className = 'result-badge';
     } else if (type === 'close') {
         playCorrectSound();
         speak(`It was ${answerText}. Good perception.`);
-        resultBadge.textContent = '\u2248 Close!';
-        resultBadge.className = 'result-badge close-result';
     } else {
         playTryAgainSound();
         speak(`It was ${answerText}.`);
-        resultBadge.textContent = '\u2717 No';
-        resultBadge.className = 'result-badge no-result';
     }
 
-    showOnly(resultArea);
-    exitBtn.classList.add('hidden');
-
-    if (mode === 'words') {
-        resultContent.textContent = answerText;
-        resultContent.className = 'word-display';
+    // Auto-advance to next item (unless session is done)
+    exerciseActive = false;
+    if (sessionComplete) {
+        goToSettings();
     } else {
-        resultContent.textContent = currentDisplay + ' ' + answerText;
-        resultContent.className = 'image-display';
-        resultContent.style.fontSize = '';
+        startExercise();
     }
 }
 
@@ -1951,6 +1996,21 @@ function init() {
         showOnly(dashboardPanel);
     });
     btnDashboardBack.addEventListener('click', () => showOnly(settingsPanel));
+
+    // Activity Log
+    const activityLogToggle = document.getElementById('activity-log-toggle');
+    const activityLogSection = document.getElementById('activity-log-section');
+    activityLogToggle.addEventListener('click', () => {
+        const isHidden = activityLogSection.classList.contains('hidden');
+        if (isHidden) {
+            renderActivityLog();
+            activityLogSection.classList.remove('hidden');
+            activityLogToggle.textContent = 'Hide Activity Log';
+        } else {
+            activityLogSection.classList.add('hidden');
+            activityLogToggle.textContent = 'Activity Log';
+        }
+    });
 
     // Exit button
     exitBtn.addEventListener('click', stopExercise);

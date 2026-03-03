@@ -761,3 +761,51 @@ body {
     line-height: 1.4;
 }
 
+/* ---- Activity Log ---- */
+.activity-log-area {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.activity-log-table-wrap {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.activity-log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.activity-log-table th {
+    padding: 0.5rem 0.4rem;
+    text-align: left;
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+}
+
+.activity-log-table td {
+    padding: 0.4rem 0.4rem;
+    text-align: left;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    max-width: 180px;
+    word-wrap: break-word;
+}
+
+.activity-log-table tbody tr:hover {
+    background: var(--surface);
+}
+
