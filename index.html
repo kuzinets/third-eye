@@ -26,6 +26,14 @@
                 <button id="btn-words" class="toggle-btn active">Words</button>
                 <button id="btn-images" class="toggle-btn">Images</button>
             </div>
+            <div id="word-level-row" class="setting-row">
+                <label for="word-level">Word Level</label>
+                <select id="word-level">
+                    <option value="visual">Visual Objects (easier)</option>
+                    <option value="abstract">Abstract Concepts (harder)</option>
+                    <option value="all">All Words</option>
+                </select>
+            </div>
 
             <div class="timer-section">
                 <h3>Practice Settings</h3>
@@ -212,6 +220,7 @@
     <!-- Exercise exit button -->
     <button id="exit-btn" class="exit-btn hidden" aria-label="Back to menu">&times;</button>
 
+    <script src="data.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
