@@ -1690,12 +1690,15 @@ function processGuess(transcript) {
         guessHistory.push(guess);
         llmPending = true;
         lastHeard.textContent = `"${raw}" — thinking...`;
+        const logType = mode === 'words' ? 'Word' : 'Image';
+        const logTarget = currentAnswer[0];
         llmEvaluate(guess, currentAnswer[0], feedbackMode, guessHistory).then(result => {
             llmPending = false;
-            if (!itemActive) return; // Exercise ended while waiting
 
             if (result) {
                 const msg = result.message || 'Keep trying.';
+                appendLogEntry(logType, logTarget, raw, msg);
+                if (!itemActive) return; // Exercise ended while waiting — logged above
                 if (result.rating === 'exact') {
                     playCorrectSound();
                     speak(msg + ' Open your eyes and mark it.');
@@ -1709,15 +1712,15 @@ function processGuess(transcript) {
                     speak(msg);
                     lastHeard.textContent = `"${raw}" — ${msg}`;
                 }
-                appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, msg);
             } else {
                 // LLM failed, fall back to simple mode
                 const phrase = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
                 tryAgainIndex++;
+                appendLogEntry(logType, logTarget, raw, phrase);
+                if (!itemActive) return; // Exercise ended while waiting — logged above
                 playTryAgainSound();
                 speak(phrase);
                 lastHeard.textContent = `"${raw}" — ${phrase}`;
-                appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, phrase);
             }
         });
         return;
