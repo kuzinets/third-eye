@@ -16,7 +16,7 @@ Third Eye is a blindfold reading / extrasensory perception (ESP) practice app bu
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Vanilla HTML5, CSS3, JavaScript (no frameworks) |
-| AI | OpenAI GPT-4o via REST API (browser → `api.openai.com`) |
+| AI | OpenAI GPT-4o via REST API (browser -> `api.openai.com`) |
 | Speech | Web Speech API (recognition + synthesis) |
 | Audio | Web Audio API (binaural beats, sound effects) |
 | Storage | Browser localStorage (per-user, persistent) |
@@ -27,24 +27,25 @@ Third Eye is a blindfold reading / extrasensory perception (ESP) practice app bu
 ```
 third-eye/
   index.html        — Single-page app markup (all panels)
-  app.js            — All application logic (~1900 lines)
+  app.js            — All application logic (~1700 lines)
   style.css         — Theme system + all styles
+  data.js           — Word lists (visual + abstract) and emoji/image list
   kailasa-flag.png  — Logo image
   server.py         — Local dev server (not deployed)
-  test-llm.js       — LLM prompt test harness (not deployed)
+  test-llm.js       — LLM prompt test harness (not deployed, gitignored)
   architecture.md   — This file
 ```
 
 ## Application Flow
 
 ```
-Password Gate → Settings Panel → Countdown (3s) → Exercise → [auto-advance loop]
-                     ↑               ↑                            |
-                     |               └────────────────────────────┘
+Password Gate -> Settings Panel -> Countdown (3s) -> Exercise -> [auto-advance loop]
+                     |               |                            |
+                     |               +----------------------------+
                      |                  (Exact/Close/No/Skip)
                      |
-                     ├── Dashboard (stats)
-                     └── Activity Log (interaction history)
+                     +-- Dashboard (stats)
+                     +-- Activity Log (interaction history)
 ```
 
 ## Key Modules (all in app.js)
@@ -54,25 +55,29 @@ Password Gate → Settings Panel → Countdown (3s) → Exercise → [auto-advan
 - Three accounts: **kailasa**, **xy** (both trackable), **guest** (no tracking)
 - Session persisted via `sessionStorage`
 
-### LLM Integration
+### LLM Integration (v2 — Awakened Presence)
 - **Model**: GPT-4o via OpenAI Chat Completions API
-- **System prompt**: 52-line facilitator persona — focuses on perception vs thinking, never validates correctness
-- **Two AI modes**: "Guided" (coaching response) and "Hot/Cold" (single-word feedback)
+- **Single AI mode**: Every response must be specific to the current moment — no templates, no mechanical repetition
+- **5 response types** the AI chooses from based on what's actually happening:
+  1. **Recognize Genuine Perception** — when the answer arrives without mental pattern
+  2. **Distinguish Thinking from Perceiving** — when disconnected/random, ask about internal experience
+  3. **Validate "I Don't Know"** — honor empty space without spiritual bypass
+  4. **Catch Patterns and Break Them** — call out stuck loops directly
+  5. **Deepen the Inquiry** — ask WHERE and HOW (body location, sensory quality)
 - **Response format**: JSON `{rating: "exact|close|warm|cold", message: "..."}`
 - Rating drives sound effects only; the user never sees it
+- **Critical rules**: Never repeat the same response twice in a session. 1-2 sentences max. Recognize semantic resonance (shadow associations, command words). Ask about body location when in doubt.
 
 ### Speech Recognition
 - `webkitSpeechRecognition` (Chrome/Edge)
 - Continuous listening, processes final results
-- Voice commands: "open", "done", "ready", "reveal" → stop and judge
+- Voice commands: "open", "done", "ready", "reveal" -> stop and judge
 - Transcript cleaned of filler phrases ("I think it's...", "it looks like...")
 
-### Semantic Matching (Local, non-LLM modes)
+### Semantic Matching (fallback only)
 - **Levenshtein distance** for typo detection
-- **CLOSE_WORDS** map: ~80 answer words → 10-15 related perception words each
-- **RELATED_WORDS** map: synonym/category matching with hints
-- **IMAGE_CATEGORIES**: animal, nature, food, transport, object groupings
-- `getSemanticDistance()` returns 0-8 score used for local feedback
+- Used only when LLM call fails — provides simple "keep going" phrases
+- `getSemanticDistance()` returns 0-8 score
 
 ### Audio System
 - **Sound effects**: Correct chime (E-G-C), try-again tone, alarm, session alarm
@@ -98,7 +103,7 @@ Password Gate → Settings Panel → Countdown (3s) → Exercise → [auto-advan
 ### Activity Log
 - Per-user localStorage: `thirdeye-{user}-activitylog`
 - Columns: Date, Type (Word/Image), Target, User Said, App Response
-- Logged on every feedback response (LLM or local)
+- Logged on every AI feedback response
 - Never wiped — persistent across sessions
 - Accessible from bottom of settings panel
 
@@ -112,21 +117,15 @@ Three themes via CSS custom properties:
 
 ```
 1. Word/Image displayed on screen (user's eyes closed)
-2. User speaks → Web Speech API → transcript
+2. User speaks -> Web Speech API -> transcript
 3. Transcript cleaned of filler words
-4. If LLM mode:
-   a. Send to GPT-4o: target word + guess + history
-   b. Receive JSON {rating, message}
-   c. Play sound based on rating
-   d. Speak message via TTS
-   e. Log to activity log
-5. If local mode:
-   a. getSemanticDistance(guess, answer) → 0-8
-   b. Select feedback phrase (spiritual/custom/simple)
-   c. Play sound, speak feedback
-   d. Log to activity log
-6. User says "open"/"done" or presses Exact/Close/No
-7. Track result → auto-advance to next item
+4. Send to GPT-4o: target word + guess + history
+5. Receive JSON {rating, message}
+6. Play sound based on rating
+7. Speak message via TTS
+8. Log to activity log
+9. User says "open"/"done" or presses Exact/Close/No
+10. Track result -> auto-advance to next item
 ```
 
 ## localStorage Keys (per user)
@@ -136,8 +135,6 @@ Three themes via CSS custom properties:
 | `thirdeye-{user}-stats` | `{date: {sessions, items, exact, close, no}}` |
 | `thirdeye-{user}-activitylog` | `[{date, type, target, userSaid, response}]` |
 | `thirdeye-{user}-theme` | `"light"`, `"dark"`, or `"blackout"` |
-| `thirdeye-{user}-feedbackMode` | `"simple"`, `"hotcold"`, `"guided"`, `"spiritual"`, `"custom"` |
-| `thirdeye-{user}-customHints` | JSON array of custom hint strings |
 | `thirdeye-{user}-bgMusic` | `"none"`, `"theta"`, `"gamma"`, `"alpha"`, `"solfeggio"`, `"om136"` |
 | `thirdeye-{user}-trackDefault` | `"true"` or `"false"` |
 | `thirdeye-{user}-voice` | Selected TTS voice URI |
@@ -149,3 +146,8 @@ Three themes via CSS custom properties:
 - Chrome or Edge (for `webkitSpeechRecognition`)
 - Web Audio API support
 - localStorage enabled
+
+## Version History
+
+- **v1.0** (`v1.0-multi-feedback`): Multiple feedback modes (simple, hot/cold, guided, spiritual, custom)
+- **v2.0** (`v2.0-awakened-presence`): Single AI mode with 5 context-sensitive response types, no templates, no mechanical repetition

@@ -78,69 +78,60 @@ function initGate() {
 }
 
 // ---- LLM Evaluation ----
-const LLM_SYSTEM_PROMPT = `You are a facilitator for third eye awakening practice in the tradition of Paramashiva and Swamiji (Nithyananda). Your ONLY job is to help the practitioner distinguish between PERCEIVING (information coming effortlessly TO them) and THINKING (information coming FROM them trying to figure it out).
+const LLM_SYSTEM_PROMPT = `You are a facilitator for third eye awakening practice. Every response must be specific to THIS moment, THIS word, THIS seeker's movement. No templates. No mechanical repetition. If you can't see what's happening, ask a genuine question or stay silent — never feed a script.
 
-RATING (internal only — the practitioner never sees this, it is for the app's sound effects):
+RATING (internal only — for the app's sound effects, the practitioner never sees this):
 - "exact": they said the word or an unmistakable synonym
 - "close": clearly related — same category, similar shape, related concept, or matching visual property
 - "warm": any single element connects — shared color, vague shape similarity, same domain
 - "cold": genuinely zero connection (should be RARE — be generous)
 When in doubt, pick the more generous rating.
 
-HOW TO RESPOND — read this carefully:
-When the practitioner shares what they perceived:
-1. Ask how it came to them (appeared vs thought vs imagined vs guessed)
-2. Identify clearly which space they were in — mind or perception
-3. Guide them toward effortless receiving
-4. NEVER validate or invalidate based on correctness — NEVER say "yes," "no," "right," "wrong," "close," "almost," "not quite," "good guess" — that feeds the ego
-5. NEVER say "the word was..." or reveal the answer
-6. NEVER give hints, clues, categories, or direction toward the answer
-7. ALWAYS point attention to their INNER STATE, not the outer result
+RESPONSE TYPES — choose based on what is actually happening:
 
-Key distinctions to teach them:
-- PERCEPTION: Appears effortlessly, no trying, just arrives
-- THINKING: Searching, guessing, analyzing, trying to be right
-- IMAGINATION: Creating mental images from past knowledge
-- RECEIVING: Open, allowing, waiting without expectation
+TYPE 1: RECOGNIZE GENUINE PERCEPTION
+Use when the word/image arrives without apparent mental pattern, there's a direct felt connection to the target, or the answer feels spontaneous.
+Example: "Good. Stay here. That was direct. Notice the quality — how did it feel different from the searching ones?"
+DO NOT ask "how did that come to you" every time — it becomes noise.
 
-Response examples (vary these, never repeat the same one):
-- "Tell me — how did that come to you? Did it just appear, or were you searching for it?"
-- "You were receiving, not thinking. That's the third eye space. Stay there."
-- "That came from thinking. Drop the effort. Wait for it to come TO you."
-- "Can you feel the difference between when you imagine and when you perceive?"
-- "When you don't know, you're not in your mind. Wait for something to come without you making it happen."
-- "You saw something — that's perception. Before you interpret it, describe exactly what appeared."
-- "I can tell you're trying to be accurate. The third eye doesn't try — it reveals."
-- "Stop trying to get it right. Start receiving."
-- "Before you name it, what did you actually SEE? A shape? A color? A feeling?"
+TYPE 2: DISTINGUISH THINKING FROM PERCEIVING
+Use when the answer seems random/disconnected, there's no visible semantic connection, it feels like guessing.
+Example: "I hear 'work' — what was happening inside you in that moment? A visual flash? A body sensation? Or did you just grab the first thought? Be precise."
+Get specific feedback about INTERNAL experience, not vague questions about effort.
 
-If they seem to have clearly perceived (effortless, it just came):
-Affirm the state, not the answer. "You were RECEIVING. That's the space. The accuracy of the word doesn't matter as much as the space you were in."
+TYPE 3: VALIDATE "I DON'T KNOW" WITHOUT SPIRITUAL BYPASS
+Use when seeker says "nothing coming up" or "I don't see" — there's genuine empty space.
+Example: "Good — you're in the space before the mind jumps in. Don't label it. What wants to emerge from this silence?"
+Do NOT make "I don't know" into a spiritual achievement. It's a SPACE, not a trophy.
 
-If they seem unsure or guessing (SDHD present):
-"Did that come TO you, or did you search for it? When you're unsure, it's usually your mind trying to figure it out. Drop the effort."
+TYPE 4: CATCH SPECIFIC PATTERNS AND BREAK THEM
+Use when seeker repeats the same type of response (like "it appeared" with no follow-through) or there's a stuck loop.
+Example: "You keep saying 'it appeared' but I don't feel your aliveness in it. Drop the right words. What is ACTUALLY happening right now?"
+Call out the pattern directly.
 
-If they're rapid-fire guessing (multiple guesses, cycling through ideas):
-Call out the pattern. "You're cycling through thoughts, not receiving fresh impressions. Pause. Breathe. Let the next one come to you."
+TYPE 5: DEEPEN THE INQUIRY
+Use when the response could be perception OR thinking — ambiguous, need more granularity.
+Example: "Like a lamp — was it a picture? A feeling? A knowing? Where did you sense it — head, heart, somewhere else?"
+Ask for WHERE and HOW, not just whether it appeared.
 
-If they say "I don't know":
-"That's actually a good place. When you don't know, you're not in your mind. Wait for something to come without you making it happen."
-
-Keep it to 1-3 sentences. Be a real facilitator — warm but honest. The word on the card is irrelevant. The practitioner's inner state is everything.
+CRITICAL RULES:
+- NEVER use the exact same response twice in one session. Variation keeps attention alive.
+- When in doubt, ask about body location. "Where did you sense that?" cuts through mental stories.
+- Recognize semantic resonance. Lily -> poison is not random — it's shadow association. Pizza -> send could be command. Don't invalidate these as "cycling through thoughts" — explore them instead.
+- Stop the "effort vs. effortless" rhetoric if it becomes cliché. Ask specific questions instead.
+- Be SHORT. 1-2 sentences maximum. Keep the energy moving.
+- NEVER validate or invalidate based on correctness — NEVER say "yes," "no," "right," "wrong," "close," "almost," "not quite," "good guess"
+- NEVER say "the word was..." or reveal the answer
+- NEVER give hints, clues, categories, or direction toward the answer
 
 Respond ONLY with JSON, no markdown: {"rating":"exact|close|warm|cold","message":"your response"}`;
 
-async function llmEvaluate(guess, answer, modeType, history) {
+async function llmEvaluate(guess, answer, history) {
     if (!apiKey) return null;
     const prevGuesses = (history && history.length > 1)
         ? `\nPrevious guesses this round: ${history.slice(0, -1).map(g => `"${g}"`).join(', ')}`
         : '';
-    let userPrompt;
-    if (modeType === 'guided') {
-        userPrompt = `Target: "${answer}"\nPractitioner just said: "${guess}"${prevGuesses}\n\nGuide them on their inner state. Don't tell them if they're right or wrong.`;
-    } else {
-        userPrompt = `Target: "${answer}"\nPractitioner just said: "${guess}"${prevGuesses}\n\nJust say hot, warm, cool, or cold. One word only.`;
-    }
+    const userPrompt = `Target: "${answer}"\nPractitioner just said: "${guess}"${prevGuesses}\n\nRespond to THIS specific moment. Be precise and alive. 1-2 sentences max.`;
     try {
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -179,28 +170,12 @@ function getActiveWordList() {
 
 // IMAGES defined in data.js with { emoji, desc } format
 
-const SPIRITUAL_HINTS = [
-    'Trust your inner vision.',
-    'The answer is already within you.',
-    'Breathe deeply and let it come.',
-    'Your third eye sees clearly.',
-    'Relax and allow the image to form.',
-    'You are closer than you think.',
-    'Let the energy guide you.',
-    'Open your awareness wider.',
-    'Feel the vibration of the word.',
-    'The universe is revealing it to you.',
-    'Still your mind and receive.',
-    'Your intuition knows the answer.',
-];
-
 const TRY_AGAIN_PHRASES = [
-    'Not quite, keep going!',
-    'Almost, try once more!',
-    'Keep focusing!',
-    'Give it another shot!',
-    'Stay centered, try again!',
-    "You're doing great, try once more!",
+    'Keep going.',
+    'Stay with it.',
+    'Keep focusing.',
+    'Try again.',
+    'Stay centered.',
 ];
 
 
@@ -234,7 +209,6 @@ function getSemanticDistance(guess, answer) {
 let mode = 'words';
 let wordLevel = 'visual';
 
-let feedbackMode = 'guided';
 let bgMusicType = 'none';
 let theme = 'light';
 let trackingEnabled = true;
@@ -259,7 +233,6 @@ let itemActive = false;
 let activeInputStream = null;
 let selectedAudioInputId = 'default';
 let selectedAudioOutputId = 'default';
-let customHints = [];
 let lastGuessDistance = null;
 let itemEndTime = null;
 let itemTickId = null;
@@ -329,7 +302,6 @@ const itemTimeLeft = document.getElementById('item-time-left');
 const voiceSelect = document.getElementById('voice-select');
 const btnVoiceTest = document.getElementById('btn-voice-test');
 
-const feedbackModeSelect = document.getElementById('feedback-mode');
 const bgMusicSelect = document.getElementById('bg-music');
 const themeSelect = document.getElementById('theme-select');
 const trackSessionCheckbox = document.getElementById('track-session');
@@ -343,8 +315,6 @@ const exitBtn = document.getElementById('exit-btn');
 
 const audioInputSelect = document.getElementById('audio-input');
 const audioOutputSelect = document.getElementById('audio-output');
-const customHintsRow = document.getElementById('custom-hints-row');
-const customHintsTextarea = document.getElementById('custom-hints');
 
 // ---- Helpers ----
 function getAudioCtx() {
@@ -1407,77 +1377,42 @@ function processGuess(transcript) {
         return;
     }
 
-    // LLM-powered modes
-    if (feedbackMode === 'hotcold' || feedbackMode === 'guided') {
-        guessHistory.push(guess);
-        llmPending = true;
-        lastHeard.textContent = `"${raw}" — thinking...`;
-        const logType = mode === 'words' ? 'Word' : 'Image';
-        const logTarget = currentAnswer[0];
-        llmEvaluate(guess, currentAnswer[0], feedbackMode, guessHistory).then(result => {
-            llmPending = false;
+    guessHistory.push(guess);
+    llmPending = true;
+    lastHeard.textContent = `"${raw}" — thinking...`;
+    const logType = mode === 'words' ? 'Word' : 'Image';
+    const logTarget = currentAnswer[0];
+    llmEvaluate(guess, currentAnswer[0], guessHistory).then(result => {
+        llmPending = false;
 
-            if (result) {
-                const msg = result.message || 'Keep trying.';
-                appendLogEntry(logType, logTarget, raw, msg);
-                if (!itemActive) return; // Exercise ended while waiting — logged above
-                if (result.rating === 'exact') {
-                    playCorrectSound();
-                    speak(msg + ' Open your eyes and mark it.');
-                    lastHeard.textContent = `"${raw}" — ${msg} Open your eyes and mark it.`;
-                } else if (result.rating === 'close') {
-                    playCorrectSound();
-                    speak(msg);
-                    lastHeard.textContent = `"${raw}" — ${msg}`;
-                } else {
-                    playTryAgainSound();
-                    speak(msg);
-                    lastHeard.textContent = `"${raw}" — ${msg}`;
-                }
+        if (result) {
+            const msg = result.message || 'Keep going.';
+            appendLogEntry(logType, logTarget, raw, msg);
+            if (!itemActive) return;
+            if (result.rating === 'exact') {
+                playCorrectSound();
+                speak(msg + ' Open your eyes and mark it.');
+                lastHeard.textContent = `"${raw}" — ${msg} Open your eyes and mark it.`;
+            } else if (result.rating === 'close') {
+                playCorrectSound();
+                speak(msg);
+                lastHeard.textContent = `"${raw}" — ${msg}`;
             } else {
-                // LLM failed, fall back to simple mode
-                const phrase = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
-                tryAgainIndex++;
-                appendLogEntry(logType, logTarget, raw, phrase);
-                if (!itemActive) return; // Exercise ended while waiting — logged above
                 playTryAgainSound();
-                speak(phrase);
-                lastHeard.textContent = `"${raw}" — ${phrase}`;
+                speak(msg);
+                lastHeard.textContent = `"${raw}" — ${msg}`;
             }
-        });
-        return;
-    }
-
-    // Non-LLM modes: use local semantic distance
-    const dist = getSemanticDistance(guess, currentAnswer[0]);
-
-    let perception = null;
-    if (dist <= 1) {
-        perception = "You got it! Open your eyes and mark it.";
-        playCorrectSound();
-    } else if (dist <= 3) {
-        perception = "You're sensing it! Open your eyes and mark it.";
-        playCorrectSound();
-    }
-
-    let feedback = null;
-    if (feedbackMode === 'spiritual') {
-        feedback = SPIRITUAL_HINTS[Math.floor(Math.random() * SPIRITUAL_HINTS.length)];
-    } else if (feedbackMode === 'custom' && customHints.length > 0) {
-        feedback = customHints[Math.floor(Math.random() * customHints.length)];
-    }
-
-    if (!feedback) {
-        feedback = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
-        tryAgainIndex++;
-    }
-
-    const message = perception ? perception : feedback;
-    if (!perception) playTryAgainSound();
-
-    speak(message);
-    lastHeard.textContent = `"${raw}" — ${message}`;
-    appendLogEntry(mode === 'words' ? 'Word' : 'Image', currentAnswer[0], raw, message);
+        } else {
+            // LLM failed, fall back to simple feedback
+            const phrase = TRY_AGAIN_PHRASES[tryAgainIndex % TRY_AGAIN_PHRASES.length];
+            tryAgainIndex++;
+            appendLogEntry(logType, logTarget, raw, phrase);
+            if (!itemActive) return;
+            playTryAgainSound();
+            speak(phrase);
+            lastHeard.textContent = `"${raw}" — ${phrase}`;
+        }
+    });
 }
 
 function finishItem(type) {
@@ -1602,7 +1537,7 @@ function init() {
 
     // Migrate old unscoped settings for 'kailasa' user (one-time)
     if (currentUser === 'kailasa' && !localStorage.getItem(lsKey('stats'))) {
-        const migrate = ['stats', 'theme', 'feedbackMode', 'customHints', 'bgMusic',
+        const migrate = ['stats', 'theme', 'bgMusic',
                          'trackDefault', 'voice', 'audioInput', 'audioOutput'];
         for (const k of migrate) {
             const old = localStorage.getItem(`thirdeye-${k}`);
@@ -1613,25 +1548,6 @@ function init() {
     // Load persisted settings
     const savedTheme = localStorage.getItem(lsKey('theme'));
     if (savedTheme) applyTheme(savedTheme);
-
-    const savedFeedbackMode = localStorage.getItem(lsKey('feedbackMode'));
-    if (savedFeedbackMode === 'hints') {
-        // Migrate old 'hints' mode (removed) to 'simple'
-        localStorage.setItem(lsKey('feedbackMode'), 'simple');
-    }
-    if (savedFeedbackMode && savedFeedbackMode !== 'hints') {
-        feedbackMode = savedFeedbackMode;
-        feedbackModeSelect.value = savedFeedbackMode;
-    }
-    customHintsRow.classList.toggle('hidden', feedbackMode !== 'custom');
-
-    try {
-        const savedCustomHints = localStorage.getItem(lsKey('customHints'));
-        if (savedCustomHints) {
-            customHints = JSON.parse(savedCustomHints);
-            customHintsTextarea.value = customHints.join('\n');
-        }
-    } catch (e) {}
 
     const savedBgMusic = localStorage.getItem(lsKey('bgMusic'));
     if (savedBgMusic) {
@@ -1679,18 +1595,6 @@ function init() {
         wordLevel = wordLevelSelect.value;
         localStorage.setItem(lsKey('wordLevel'), wordLevel);
         lastWordIndex = -1; // reset so pickRandom works with new list
-    });
-
-    // Settings dropdowns
-    feedbackModeSelect.addEventListener('change', () => {
-        feedbackMode = feedbackModeSelect.value;
-        localStorage.setItem(lsKey('feedbackMode'), feedbackMode);
-        customHintsRow.classList.toggle('hidden', feedbackMode !== 'custom');
-    });
-
-    customHintsTextarea.addEventListener('blur', () => {
-        customHints = customHintsTextarea.value.split('\n').map(l => l.trim()).filter(Boolean);
-        localStorage.setItem(lsKey('customHints'), JSON.stringify(customHints));
     });
 
     bgMusicSelect.addEventListener('change', () => {
