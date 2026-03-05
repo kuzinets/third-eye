@@ -11,16 +11,19 @@
 - Three accounts: kailasa, xy, guest — all data in browser localStorage
 - See `architecture.md` for full system documentation
 
-## AI Response Design (v2 — Awakened Presence)
+## AI Response Design (v2.1 — Direct Transmission)
 - Single unified AI mode — no dropdown, no mode switching
-- 5 response types chosen by GPT-4o based on what's actually happening:
-  1. Recognize genuine perception (direct hit, spontaneous)
-  2. Distinguish thinking from perceiving (random/disconnected guesses)
-  3. Validate "I don't know" without spiritual bypass
-  4. Catch and break stuck patterns
-  5. Deepen inquiry (ask WHERE in body, HOW it arrived)
-- Critical: never repeat same response twice, 1-2 sentences max, recognize semantic resonance
-- Fallback to simple phrases only when LLM call fails
+- Responses must be 1 sentence (2 max). Direct. Sensation-based. No analysis.
+- Ask about BODY LOCATION or SENSORY CHANNEL, never about "shifts" or "mental leaps"
+- Work with the sensory quality of what they said to guide next perception
+- Never analyze their process — point them to sensation
+- Never repeat same response twice in a session
+
+## IMPORTANT: Prompt History Log
+**Before making ANY changes to the LLM system prompt, READ `prompt-history.md` first.**
+This file tracks every prompt version, what failed, what worked, and what to watch for.
+It prevents accidentally rolling back to patterns that created dullness or mechanical repetition.
+Check the Activity Log in the app for real response data to inform adjustments.
 
 # currentDate
 Today's date is 2026-03-05.

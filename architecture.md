@@ -55,18 +55,18 @@ Password Gate -> Settings Panel -> Countdown (3s) -> Exercise -> [auto-advance l
 - Three accounts: **kailasa**, **xy** (both trackable), **guest** (no tracking)
 - Session persisted via `sessionStorage`
 
-### LLM Integration (v2 — Awakened Presence)
-- **Model**: GPT-4o via OpenAI Chat Completions API
-- **Single AI mode**: Every response must be specific to the current moment — no templates, no mechanical repetition
-- **5 response types** the AI chooses from based on what's actually happening:
-  1. **Recognize Genuine Perception** — when the answer arrives without mental pattern
-  2. **Distinguish Thinking from Perceiving** — when disconnected/random, ask about internal experience
-  3. **Validate "I Don't Know"** — honor empty space without spiritual bypass
-  4. **Catch Patterns and Break Them** — call out stuck loops directly
-  5. **Deepen the Inquiry** — ask WHERE and HOW (body location, sensory quality)
+### LLM Integration (v2.1 — Direct Transmission)
+- **Model**: GPT-4o via OpenAI Chat Completions API (temp 0.4, max 120 tokens)
+- **Single AI mode**: 1 sentence responses. Direct. Sensation-based. No analysis.
+- **5 response approaches** chosen based on what's happening:
+  1. **Genuine Perception** — "Stay there. Visual or feeling?"
+  2. **Thinking/Guessing** — "Where did you sense that — visual, feeling, or knowing?"
+  3. **Sensory Deepening** — work with texture of their word to guide next perception
+  4. **Empty Space** — "Stay here. What wants to arrive from this silence?"
+  5. **Pattern Breaking** — "Stop describing. Just receive."
 - **Response format**: JSON `{rating: "exact|close|warm|cold", message: "..."}`
 - Rating drives sound effects only; the user never sees it
-- **Critical rules**: Never repeat the same response twice in a session. 1-2 sentences max. Recognize semantic resonance (shadow associations, command words). Ask about body location when in doubt.
+- **Prompt history**: `prompt-history.md` tracks all prompt versions, failures, and what to watch for. Must be read before any prompt changes.
 
 ### Speech Recognition
 - `webkitSpeechRecognition` (Chrome/Edge)
@@ -119,10 +119,10 @@ Three themes via CSS custom properties:
 1. Word/Image displayed on screen (user's eyes closed)
 2. User speaks -> Web Speech API -> transcript
 3. Transcript cleaned of filler words
-4. Send to GPT-4o: target word + guess + history
+4. Send to GPT-4o: target + guess + history ("1 sentence. Direct. Sensation-based.")
 5. Receive JSON {rating, message}
 6. Play sound based on rating
-7. Speak message via TTS
+7. Speak message via TTS (1 sentence, sensation-based)
 8. Log to activity log
 9. User says "open"/"done" or presses Exact/Close/No
 10. Track result -> auto-advance to next item
@@ -150,4 +150,5 @@ Three themes via CSS custom properties:
 ## Version History
 
 - **v1.0** (`v1.0-multi-feedback`): Multiple feedback modes (simple, hot/cold, guided, spiritual, custom)
-- **v2.0** (`v2.0-awakened-presence`): Single AI mode with 5 context-sensitive response types, no templates, no mechanical repetition
+- **v2.0** (`v2.0-awakened-presence`): Single AI mode, 5 response types, no templates
+- **v2.1** (`v2.1-direct-transmission`): Radical brevity — 1 sentence, sensation-based, no analysis
