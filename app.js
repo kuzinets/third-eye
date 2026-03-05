@@ -227,6 +227,7 @@ let lastGuessDistance = null;
 let itemEndTime = null;
 let itemTickId = null;
 let llmPending = false;
+let speaking = false;
 let guessHistory = []; // previous guesses for current item, for LLM context
 
 // ---- Activity Log ----
@@ -902,10 +903,28 @@ function onVoiceChange() {
 
 function speak(text) {
     speechSynthesis.cancel();
+    speaking = true;
+    // Pause mic while speaking to prevent picking up our own voice
+    if (recognition) try { recognition.stop(); } catch (e) {}
     const utterance = new SpeechSynthesisUtterance(text);
     if (selectedVoice) utterance.voice = selectedVoice;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
+    utterance.onend = () => {
+        speaking = false;
+        // Brief cooldown so mic doesn't pick up tail end of speaker output
+        setTimeout(() => {
+            if (exerciseActive && !speaking && recognition) {
+                try { recognition.start(); } catch (e) {}
+            }
+        }, 600);
+    };
+    utterance.onerror = () => {
+        speaking = false;
+        if (exerciseActive && recognition) {
+            try { recognition.start(); } catch (e) {}
+        }
+    };
     speechSynthesis.speak(utterance);
 }
 
@@ -1340,7 +1359,7 @@ function startListening() {
     };
 
     recognition.onend = () => {
-        if (exerciseActive) {
+        if (exerciseActive && !speaking) {
             try { recognition.start(); } catch (e) { /* already started */ }
         }
     };
@@ -1349,7 +1368,7 @@ function startListening() {
 }
 
 function processGuess(transcript) {
-    if (llmPending) return; // Don't process while waiting for LLM
+    if (llmPending || speaking) return; // Don't process while waiting for LLM or while speaking
 
     const raw = transcript.trim();
 
