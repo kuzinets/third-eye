@@ -899,7 +899,14 @@ function populateVoices() {
     });
 
     if (!selectedVoice && filtered.length) {
-        selectedVoice = filtered[0];
+        // Default to Google US English if available
+        const googleUS = filtered.find(v => v.name === 'Google US English' && v.lang === 'en-US');
+        selectedVoice = googleUS || filtered[0];
+        // Select it in the dropdown
+        const selIdx = voices.indexOf(selectedVoice);
+        if (voiceSelect.querySelector(`option[value="${selIdx}"]`)) {
+            voiceSelect.value = selIdx;
+        }
     }
 }
 
@@ -1538,6 +1545,12 @@ function handleKeyboard(e) {
 
 // ---- Init ----
 function init() {
+    // Apply theme early (before gate) to avoid flash — try all possible user-scoped keys
+    const earlyTheme = localStorage.getItem('thirdeye-kailasa-theme')
+        || localStorage.getItem('thirdeye-xy-theme')
+        || localStorage.getItem('thirdeye-guest-theme');
+    if (earlyTheme) applyTheme(earlyTheme);
+
     initGate();
 
     if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
