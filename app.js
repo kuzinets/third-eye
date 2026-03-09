@@ -48,13 +48,13 @@ function initGate() {
 
     function unlock(account) {
         loginUser(account);
-        sessionStorage.setItem('thirdeye-auth', account.password);
+        localStorage.setItem('thirdeye-auth', account.password);
         gate.classList.add('hidden');
         app.classList.remove('hidden');
     }
 
-    // Check session
-    const saved = sessionStorage.getItem('thirdeye-auth');
+    // Check saved login (persists across sessions)
+    const saved = localStorage.getItem('thirdeye-auth');
     if (saved) {
         const account = ACCOUNTS.find(a => a.password === saved);
         if (account) { unlock(account); return; }
@@ -229,6 +229,7 @@ let itemTickId = null;
 let llmPending = false;
 let speaking = false;
 let guessHistory = []; // previous guesses for current item, for LLM context
+let audioFree = false;
 
 // ---- Activity Log ----
 function loadActivityLog() {
@@ -415,6 +416,7 @@ async function applyAudioOutput(deviceId) {
 
 // ---- Audio Feedback ----
 function playBeep(freq, duration, volume) {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -437,6 +439,7 @@ function playReadyTone() {
 }
 
 function playCorrectSound() {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     const now = ctx.currentTime;
     [523.25, 659.25, 783.99].forEach((freq, i) => {
@@ -455,6 +458,7 @@ function playCorrectSound() {
 }
 
 function playTryAgainSound() {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     const now = ctx.currentTime;
     [329.63, 392.00].forEach((freq, i) => {
@@ -474,6 +478,7 @@ function playTryAgainSound() {
 }
 
 function playAlarmSound() {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     const now = ctx.currentTime;
     for (let r = 0; r < 2; r++) {
@@ -495,6 +500,7 @@ function playAlarmSound() {
 }
 
 function playSessionAlarm() {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     const now = ctx.currentTime;
     for (let r = 0; r < 3; r++) {
@@ -850,6 +856,7 @@ const MUSIC_GENERATORS = {
 };
 
 function startMusic() {
+    if (audioFree) return;
     stopMusic();
     if (bgMusicType === 'none') return;
     const gen = MUSIC_GENERATORS[bgMusicType];
@@ -874,9 +881,13 @@ function populateVoices() {
     voiceSelect.innerHTML = '';
     const savedVoice = localStorage.getItem(lsKey('voice'));
 
-    voices.forEach((voice, i) => {
+    // Filter out Microsoft voices
+    const filtered = voices.filter(v => !v.name.toLowerCase().includes('microsoft'));
+
+    filtered.forEach((voice) => {
+        const idx = voices.indexOf(voice);
         const opt = document.createElement('option');
-        opt.value = i;
+        opt.value = idx;
         const label = voice.name + (voice.default ? ' (default)' : '');
         opt.textContent = `${label} [${voice.lang}]`;
         voiceSelect.appendChild(opt);
@@ -887,8 +898,8 @@ function populateVoices() {
         }
     });
 
-    if (!selectedVoice) {
-        selectedVoice = voices[0];
+    if (!selectedVoice && filtered.length) {
+        selectedVoice = filtered[0];
     }
 }
 
@@ -902,6 +913,7 @@ function onVoiceChange() {
 }
 
 function speak(text) {
+    if (audioFree) return;
     speechSynthesis.cancel();
     speaking = true;
     // Pause mic while speaking to prevent picking up our own voice
@@ -945,6 +957,7 @@ function setMode(newMode) {
     btnImages.classList.toggle('active', mode === 'images');
     document.getElementById('word-level-row').style.display = mode === 'words' ? '' : 'none';
     updateToggleModeButton();
+    if (currentUser) localStorage.setItem(lsKey('mode'), mode);
 }
 
 function updateToggleModeButton() {
@@ -1574,6 +1587,31 @@ function init() {
         trackSessionCheckbox.checked = trackingEnabled;
     }
 
+    // Session & item duration
+    const savedSessionMins = localStorage.getItem(lsKey('sessionMinutes'));
+    if (savedSessionMins) sessionMinutesInput.value = savedSessionMins;
+    const savedItemMins = localStorage.getItem(lsKey('itemMinutes'));
+    if (savedItemMins) itemMinutesInput.value = savedItemMins;
+    sessionMinutesInput.addEventListener('change', () => {
+        localStorage.setItem(lsKey('sessionMinutes'), sessionMinutesInput.value);
+    });
+    itemMinutesInput.addEventListener('change', () => {
+        localStorage.setItem(lsKey('itemMinutes'), itemMinutesInput.value);
+    });
+
+    // Audio-free mode
+    const audioFreeCheckbox = document.getElementById('audio-free');
+    const savedAudioFree = localStorage.getItem(lsKey('audioFree'));
+    if (savedAudioFree === 'true') {
+        audioFree = true;
+        audioFreeCheckbox.checked = true;
+    }
+    audioFreeCheckbox.addEventListener('change', () => {
+        audioFree = audioFreeCheckbox.checked;
+        localStorage.setItem(lsKey('audioFree'), String(audioFree));
+        if (audioFree) stopMusic();
+    });
+
     // Voices
     populateVoices();
     speechSynthesis.onvoiceschanged = populateVoices;
@@ -1593,6 +1631,8 @@ function init() {
     });
 
     // Mode toggle
+    const savedMode = localStorage.getItem(lsKey('mode'));
+    if (savedMode) setMode(savedMode);
     btnWords.addEventListener('click', () => setMode('words'));
     btnImages.addEventListener('click', () => setMode('images'));
 
