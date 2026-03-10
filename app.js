@@ -346,6 +346,7 @@ function levenshtein(a, b) {
 
 // ---- Audio Devices ----
 async function enumerateAudioDevices() {
+    if (audioFree) return; // Don't request mic — avoids claiming audio focus
     try {
         // Need permission to get device labels
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1354,6 +1355,10 @@ function showExercise() {
 }
 
 function startListening() {
+    if (audioFree) {
+        listeningStatus.textContent = 'Audio-free mode — mic disabled';
+        return;
+    }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         listeningStatus.textContent = 'Speech not supported in this browser. Use Chrome or Edge.';
@@ -1379,7 +1384,7 @@ function startListening() {
     };
 
     recognition.onend = () => {
-        if (exerciseActive && !speaking) {
+        if (exerciseActive && !speaking && !audioFree) {
             try { recognition.start(); } catch (e) { /* already started */ }
         }
     };
@@ -1622,7 +1627,21 @@ function init() {
     audioFreeCheckbox.addEventListener('change', () => {
         audioFree = audioFreeCheckbox.checked;
         localStorage.setItem(lsKey('audioFree'), String(audioFree));
-        if (audioFree) stopMusic();
+        if (audioFree) {
+            stopMusic();
+            speechSynthesis.cancel();
+            // Stop speech recognition so mic doesn't claim audio focus
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            // Release any active mic stream
+            if (activeInputStream) {
+                activeInputStream.getTracks().forEach(t => t.stop());
+                activeInputStream = null;
+            }
+            // Suspend AudioContext so it releases audio session
+            if (audioCtx && audioCtx.state === 'running') {
+                audioCtx.suspend();
+            }
+        }
     });
 
     // Voices
