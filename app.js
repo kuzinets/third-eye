@@ -1650,8 +1650,15 @@ function init() {
     voiceSelect.addEventListener('change', onVoiceChange);
     btnVoiceTest.addEventListener('click', () => speak('Third Eye is ready.'));
 
-    // Audio devices
-    enumerateAudioDevices();
+    // Audio devices — defer enumeration until user interacts (avoids claiming audio focus on load)
+    let devicesEnumerated = false;
+    function lazyEnumerateDevices() {
+        if (devicesEnumerated) return;
+        devicesEnumerated = true;
+        enumerateAudioDevices();
+    }
+    audioInputSelect.addEventListener('focus', lazyEnumerateDevices);
+    audioOutputSelect.addEventListener('focus', lazyEnumerateDevices);
     audioInputSelect.addEventListener('change', () => {
         selectedAudioInputId = audioInputSelect.value;
         localStorage.setItem(lsKey('audioInput'), selectedAudioInputId);
