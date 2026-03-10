@@ -230,6 +230,14 @@ let llmPending = false;
 let speaking = false;
 let guessHistory = []; // previous guesses for current item, for LLM context
 let audioFree = false;
+let voicesInitialized = false;
+
+function initVoices() {
+    if (voicesInitialized) return;
+    voicesInitialized = true;
+    populateVoices();
+    speechSynthesis.onvoiceschanged = populateVoices;
+}
 
 // ---- Activity Log ----
 function loadActivityLog() {
@@ -924,6 +932,7 @@ function onVoiceChange() {
 
 function speak(text) {
     if (audioFree) return;
+    initVoices();
     speechSynthesis.cancel();
     speaking = true;
     // Pause mic while speaking to prevent picking up our own voice
@@ -1631,7 +1640,7 @@ function init() {
         localStorage.setItem(lsKey('audioFree'), String(audioFree));
         if (audioFree) {
             stopMusic();
-            speechSynthesis.cancel();
+            if (voicesInitialized) speechSynthesis.cancel();
             // Stop speech recognition so mic doesn't claim audio focus
             if (recognition) try { recognition.stop(); } catch (e) {}
             // Release any active mic stream
@@ -1643,14 +1652,19 @@ function init() {
             if (audioCtx && audioCtx.state === 'running') {
                 audioCtx.suspend();
             }
+        } else {
+            // Turning audio back on — initialize voices now
+            initVoices();
         }
     });
 
-    // Voices
-    populateVoices();
-    speechSynthesis.onvoiceschanged = populateVoices;
+    // Voices — defer speechSynthesis access when audio-free to avoid claiming audio focus on mobile
+    if (!audioFree) {
+        initVoices();
+    }
     voiceSelect.addEventListener('change', onVoiceChange);
-    btnVoiceTest.addEventListener('click', () => speak('Third Eye is ready.'));
+    voiceSelect.addEventListener('focus', initVoices); // populate on interaction if deferred
+    btnVoiceTest.addEventListener('click', () => { initVoices(); speak('Third Eye is ready.'); });
 
     // Audio devices — defer enumeration until user interacts (avoids claiming audio focus on load)
     let devicesEnumerated = false;
