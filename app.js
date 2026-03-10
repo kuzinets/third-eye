@@ -394,6 +394,7 @@ async function activateAudioInput(deviceId) {
         activeInputStream.getTracks().forEach(t => t.stop());
         activeInputStream = null;
     }
+    if (audioFree) return; // Don't request mic in audio-free mode
     if (!deviceId || deviceId === 'default') return;
     try {
         activeInputStream = await navigator.mediaDevices.getUserMedia({
@@ -405,6 +406,7 @@ async function activateAudioInput(deviceId) {
 }
 
 async function applyAudioOutput(deviceId) {
+    if (audioFree) return;
     const ctx = getAudioCtx();
     if (ctx.setSinkId) {
         try {
@@ -934,14 +936,14 @@ function speak(text) {
         speaking = false;
         // Brief cooldown so mic doesn't pick up tail end of speaker output
         setTimeout(() => {
-            if (exerciseActive && !speaking && recognition) {
+            if (exerciseActive && !speaking && !audioFree && recognition) {
                 try { recognition.start(); } catch (e) {}
             }
         }, 600);
     };
     utterance.onerror = () => {
         speaking = false;
-        if (exerciseActive && recognition) {
+        if (exerciseActive && !audioFree && recognition) {
             try { recognition.start(); } catch (e) {}
         }
     };
