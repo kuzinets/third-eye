@@ -540,6 +540,29 @@ body {
     color: var(--btn-text);
 }
 
+/* ---- Note Input ---- */
+.note-row {
+    margin-top: 0.6rem;
+    display: flex;
+    justify-content: center;
+}
+
+.item-note-input {
+    width: 90%;
+    max-width: 400px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.item-note-input::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+}
+
 /* ---- Mid-Session Controls ---- */
 #mid-session-controls {
     margin-top: 0.8rem;

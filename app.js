@@ -248,15 +248,17 @@ function loadActivityLog() {
     }
 }
 
-function appendLogEntry(type, target, userSaid, response) {
+function appendLogEntry(type, target, userSaid, response, note) {
     const log = loadActivityLog();
-    log.push({
+    const entry = {
         date: new Date().toISOString(),
         type,           // 'Word' or 'Image'
         target,         // the actual word or emoji description
         userSaid,       // raw speech transcript
         response,       // app's feedback message
-    });
+    };
+    if (note) entry.note = note;
+    log.push(entry);
     localStorage.setItem(lsKey('activitylog'), JSON.stringify(log));
 }
 
@@ -286,6 +288,7 @@ const btnExact = document.getElementById('btn-exact');
 const btnAlmost = document.getElementById('btn-almost');
 const btnNo = document.getElementById('btn-no');
 const btnSkip = document.getElementById('btn-skip');
+const itemNoteInput = document.getElementById('item-note');
 const btnToggleMode = document.getElementById('btn-toggle-mode');
 const resultBadge = document.getElementById('result-badge');
 
@@ -892,8 +895,9 @@ function populateVoices() {
     voiceSelect.innerHTML = '';
     const savedVoice = localStorage.getItem(lsKey('voice'));
 
-    // Filter out Microsoft voices
+    // Filter out Microsoft voices and sort alphabetically for consistent order across devices
     const filtered = voices.filter(v => !v.name.toLowerCase().includes('microsoft'));
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
 
     filtered.forEach((voice) => {
         const idx = voices.indexOf(voice);
@@ -1108,6 +1112,8 @@ function renderActivityLog() {
             <td>${escaped(entry.target)}</td>
             <td>${escaped(entry.userSaid)}</td>
             <td>${escaped(entry.response)}</td>
+            <td>${escaped(entry.rating || '')}</td>
+            <td>${escaped(entry.note || '')}</td>
         </tr>`;
     }
     logBody.innerHTML = html;
@@ -1460,8 +1466,40 @@ function processGuess(transcript) {
     });
 }
 
+function getAndClearNote() {
+    const note = itemNoteInput.value.trim();
+    itemNoteInput.value = '';
+    return note || '';
+}
+
+function attachNoteToLastLogEntry(note, rating) {
+    if (!note && !rating) return;
+    const log = loadActivityLog();
+    // Find the last entry matching the current target
+    const target = currentAnswer ? currentAnswer[0] : null;
+    for (let i = log.length - 1; i >= 0; i--) {
+        if (target && log[i].target === target) {
+            if (note) log[i].note = note;
+            if (rating) log[i].rating = rating;
+            localStorage.setItem(lsKey('activitylog'), JSON.stringify(log));
+            return;
+        }
+    }
+    // No existing entry (e.g. skip before any guess) — create one
+    if (target) {
+        const logType = mode === 'words' ? 'Word' : 'Image';
+        const entry = { date: new Date().toISOString(), type: logType, target, userSaid: '', response: '' };
+        if (note) entry.note = note;
+        if (rating) entry.rating = rating;
+        log.push(entry);
+        localStorage.setItem(lsKey('activitylog'), JSON.stringify(log));
+    }
+}
+
 function finishItem(type) {
+    const note = getAndClearNote();
     trackEvent(type);
+    attachNoteToLastLogEntry(note, type);
     itemActive = false;
     stopItemTimer();
     if (recognition) {
@@ -1521,16 +1559,20 @@ function goToSettings() {
 }
 
 function stopExercise() {
+    const note = getAndClearNote();
     if (itemActive) {
         trackEvent('gaveup');
+        attachNoteToLastLogEntry(note, 'stop');
         itemActive = false;
     }
     goToSettings();
 }
 
 function skipExercise() {
+    const note = getAndClearNote();
     if (itemActive) {
         trackEvent('gaveup');
+        attachNoteToLastLogEntry(note, 'skip');
         itemActive = false;
     }
     stopItemTimer();
