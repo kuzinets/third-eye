@@ -1588,6 +1588,8 @@ function skipExercise() {
 // ---- Keyboard Controls ----
 function handleKeyboard(e) {
     if (!exerciseActive) return;
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
 
     if (e.key === 'Escape') {
         e.preventDefault();
