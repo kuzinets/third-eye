@@ -51,6 +51,7 @@ function initGate() {
         localStorage.setItem('thirdeye-auth', account.password);
         gate.classList.add('hidden');
         app.classList.remove('hidden');
+        document.body.classList.add('show-reading');
     }
 
     // Check saved login (persists across sessions)
@@ -330,6 +331,8 @@ function getAudioCtx() {
 function showOnly(panel) {
     [settingsPanel, countdownArea, exerciseArea, resultArea, dashboardPanel].forEach(p => p.classList.add('hidden'));
     panel.classList.remove('hidden');
+    // Reading panel + its reserved space only on the front (settings) page
+    document.body.classList.toggle('show-reading', panel === settingsPanel);
 }
 
 function pickRandom(arr, lastIndex) {
